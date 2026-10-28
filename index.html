@@ -448,6 +448,12 @@ a.btn{text-decoration:none;display:inline-block}
       <div class="tblwrap"><table class="cat" id="catTbl"></table></div>
       <div class="pb note"><b>Código</b>: nombre corto que se ve en la carga de pedidos, la lista y el consolidado; si lo dejás vacío se usa el ID artículo. Unidad <b>kg</b>: la cantidad se toma en kilos y se convierte a CAJ con el peso por caja. El <b>peso por caja</b> también se usa en el Ruteo para calcular los kg de cada camión. El precio es por la unidad de venta. El precio de lista se usa cuando el cliente no tiene una compra anterior del producto.</div>
     </div>
+    <div class="panel" style="margin-top:18px" id="usrPanel" hidden>
+      <div class="ph"><h2>Usuarios</h2><span class="chip" id="usrCnt">0</span><span class="sp"></span><span class="note">Solo lo ven los administradores</span></div>
+      <div class="pb note">Cada persona entra con su <b>link personal</b>: lo abre y listo, sin cargar link, clave ni nombre. Lo que hace queda con su nombre. Si alguien deja de usar la app, tocá <b>Desactivar</b>; <b>Nuevo link</b> invalida el anterior (por ejemplo, si se compartió por error). Los cambios tardan hasta un minuto en aplicarse.</div>
+      <div class="pb clrow" style="padding-top:0"><input class="inp" id="usrNom" placeholder="Nombre de la persona" style="width:220px"><select class="inp" id="usrRol" style="width:auto"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select><button class="btn sm pri" id="usrAdd">Crear link</button><span class="note" id="usrOut"></span></div>
+      <div class="tblwrap"><table id="usrTbl"></table></div>
+    </div>
     <div class="panel" style="margin-top:18px">
       <div class="ph"><h2>Clientes provisorios</h2><span class="chip" id="provCnt">0</span><span class="sp"></span><label class="tgl"><input type="checkbox" id="provVinc"> Ver vinculados</label></div>
       <div class="pb note">Clientes cargados a mano porque todavía no estaban en el sistema. Cuando entren con PEDIDOS BD, tocá <b>Vincular</b> y elegí el cliente real: sus pedidos, su ubicación y sus sucursales pasan a ese cliente. Para crear uno: en <b>Pedidos</b>, buscalo y elegí <b>+ Cliente nuevo (provisorio)</b>.</div>
@@ -491,6 +497,21 @@ const S={
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}};
 const Con=Object.assign({url:"",k:"",yo:""},lsGet("rt_con",{}));
+// Link personal: …/pedidos/#u=<id de la implementación>&k=<clave>. Se guarda en este navegador y se borra de la barra de direcciones.
+(function(){const h=new URLSearchParams(location.hash.slice(1));const u=h.get("u"),k=h.get("k");if(!u||!k)return;
+  const url="https://script.google.com/macros/s/"+u+"/exec";if(url!==Con.url){try{localStorage.removeItem("pa_cache")}catch(e){}}
+  Object.assign(Con,{url,k,yo:""});lsSet("rt_con",Con);history.replaceState(null,"",location.pathname+location.search)})();
+// Si la app ya estaba abierta y se abre un link personal en la misma pestaña, el navegador no recarga: se fuerza.
+addEventListener("hashchange",()=>{if(/[#&]k=/.test(location.hash))location.reload()});
+S.admin=false;
+// Pregunta a la planilla quién es el dueño de la clave. Con link personal, el nombre lo da la planilla.
+async function quienSoy(){
+  const j=await call("ping");const u=j.usuario||{nombre:Con.yo,admin:true};
+  S.admin=!!u.admin;S.ver=j.version||0;
+  if(!u.admin){Con.yo=u.nombre;lsSet("rt_con",Con)}
+  S.uid=u.admin?(Con.yo||null):u.nombre;
+  renderBanners();renderUsuarios();return j;
+}
 async function call(a,p){
   if(!Con.url||!Con.k)throw new Error("Falta conectar la planilla (botón Conexión)");
   let r;try{r=await fetch(Con.url,{method:"POST",body:JSON.stringify(Object.assign({k:Con.k,a,por:Con.yo},p||{}))})}
@@ -1046,6 +1067,34 @@ function renderSucList(){
     :`<tbody><tr><td><div class="empty"><b>Todavía no hay sucursales cargadas</b>En Pedidos, buscá al cliente y tocá + Sucursal.</div></td></tr></tbody>`;
 }
 $("#sucInact").addEventListener("change",renderSucList);
+/* Usuarios (solo administradores): crear, copiar el link personal, desactivar o renovar. */
+S.users=null;let usrArmed={};
+const linkBase=()=>location.protocol.startsWith("http")?location.origin+location.pathname:"https://aviguri.github.io/pedidos/";
+function linkDe(u){const m=String(Con.url).match(/\/s\/([^/]+)\/exec/);return m?`${linkBase()}#u=${m[1]}&k=${u.clave}`:""}
+async function renderUsuarios(recargar){
+  $("#usrPanel").hidden=!S.admin;if(!S.admin)return;
+  if(!(S.ver>=5)){$("#usrTbl").innerHTML=`<tbody><tr><td><div class="banner warn">Para los links personales hay que actualizar Code.gs (versión 5) en Apps Script y hacer una nueva versión de la implementación.</div></td></tr></tbody>`;return}
+  if(recargar||!S.users){try{S.users=(await call("listarUsuarios")).usuarios}catch(e){$("#usrOut").textContent=e.message;return}}
+  const us=S.users.slice().sort((a,b)=>(b.activo-a.activo)||a.nombre.localeCompare(b.nombre));
+  $("#usrCnt").textContent=us.filter(u=>u.activo).length;
+  $("#usrTbl").innerHTML=us.length?`<thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último uso</th><th></th></tr></thead><tbody>${us.map(u=>{const n=esc(u.nombre);const arm=usrArmed[u.nombre];
+    return `<tr${u.activo?"":' style="opacity:.55"'}><td><b>${n}</b><div class="note">desde ${esc(dShort(u.alta))}</div></td><td>${u.rol==="admin"?'<span class="chip acc">Administrador</span>':"Usuario"}</td>
+      <td>${u.activo?'<span class="chip st ok">Activo</span>':'<span class="chip st dng">Desactivado</span>'}</td><td class="note">${u.ultimoUso?esc(hhmm(Date.parse(u.ultimoUso))):"—"}</td>
+      <td><div class="clrow">${u.activo?`<button class="btn sm pri" data-ulink="${n}">Copiar link</button><button class="btn sm" data-umsg="${n}">Copiar mensaje</button>`:""}
+        ${arm==="renovar"?`<button class="btn sm dng" data-urenok="${n}">Confirmar nuevo link</button>`:`<button class="btn sm" data-uren="${n}" title="El link anterior deja de funcionar">Nuevo link</button>`}
+        <button class="btn sm${u.activo?" dng":""}" data-uact="${n}">${u.activo?"Desactivar":"Activar"}</button></div></td></tr>`}).join("")}</tbody>`
+    :`<tbody><tr><td><div class="empty"><b>Todavía no hay usuarios</b>Escribí un nombre arriba y tocá Crear link.</div></td></tr></tbody>`;
+}
+async function guardarUsr(user,okMsg){try{const j=await call("guardarUsuario",{user});const u=j.usuario;S.users=(S.users||[]).filter(x=>x.nombre!==u.nombre).concat([u]);usrArmed={};renderUsuarios();if(okMsg)toast(okMsg);return u}catch(e){toast(e.message)}}
+$("#usrAdd").addEventListener("click",async()=>{const nombre=$("#usrNom").value.trim();if(!nombre){toast("Escribí el nombre");return}
+  if((S.users||[]).some(u=>u.nombre.toLowerCase()===nombre.toLowerCase())){toast("Ya existe un usuario con ese nombre");return}
+  const u=await guardarUsr({nombre,rol:$("#usrRol").value},"Usuario creado");if(u){$("#usrNom").value="";copyText(linkDe(u),"Link de "+u.nombre+" copiado: pasáselo por WhatsApp")}});
+$("#usrTbl").addEventListener("click",e=>{const g=a=>e.target.closest(`[${a}]`);const find=n=>(S.users||[]).find(u=>u.nombre===n);let b;
+  if((b=g("data-ulink"))){const u=find(b.dataset.ulink);copyText(linkDe(u),"Link de "+u.nombre+" copiado");return}
+  if((b=g("data-umsg"))){const u=find(b.dataset.umsg);copyText(`Hola ${u.nombre}! Este es tu acceso a Pedidos AVIGURI:\n${linkDe(u)}\nAbrilo desde la PC o el celular donde vas a trabajar. Es personal: no lo compartas.`,"Mensaje copiado para WhatsApp");return}
+  if((b=g("data-uren"))){usrArmed={[b.dataset.uren]:"renovar"};renderUsuarios();return}
+  if((b=g("data-urenok"))){guardarUsr({nombre:b.dataset.urenok,renovar:true},"Nuevo link generado: el anterior ya no funciona").then(u=>u&&copyText(linkDe(u),"Nuevo link de "+u.nombre+" copiado"));return}
+  if((b=g("data-uact"))){const u=find(b.dataset.uact);guardarUsr({nombre:u.nombre,activo:!u.activo},u.activo?u.nombre+" desactivado":u.nombre+" activado")}});
 // Candidatos para vincular: clientes del sistema que comparten palabras del nombre o de la dirección, priorizando altas recientes.
 const STOP=new Set(["DE","DEL","LA","LAS","LOS","EL","Y","SRL","SA","SAS","CALLE","AV","AVENIDA"]);
 const palabras=s=>new Set(norm(s).replace(/[^A-Z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>=3&&!STOP.has(w)));
@@ -1866,11 +1915,13 @@ function showView(v){if(v!=="ubicaciones"){S.ubOnly=null;S.backToRuteo=false}S.v
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>showView(t.dataset.v)));
 function renderBanners(){
   const b=[];
-  if(!S.db)b.push(`<div class="banner warn">Falta conectar la planilla: tocá <b>Conexión</b> arriba y pegá el link y la clave.</div>`);
-  else if(!S.uid)b.push(`<div class="banner warn">Poné tu nombre en <b>Conexión</b> para que quede registrado quién toma cada pedido.</div>`);
+  if(!S.db)b.push(`<div class="banner warn">Falta conectar la planilla: abrí tu <b>link personal</b> (te lo pasa el administrador) o tocá <b>Conexión</b> y pegá el link y la clave.</div>`);
+  else if(!S.uid&&S.admin)b.push(`<div class="banner warn">Poné tu nombre en <b>Conexión</b> para que quede registrado quién toma cada pedido.</div>`);
   $("#banners").innerHTML=b.join("");
   $("#yoTxt").textContent=S.uid?"· "+S.uid:"";
-  $("#conInfo").textContent=S.db?"Conectada"+(S.uid?" · "+S.uid:""):"Sin configurar";
+  $("#conInfo").textContent=S.db?"Conectada"+(S.uid?" · "+S.uid:"")+(S.admin?" · administrador":""):"Sin configurar";
+  // Con link personal el nombre lo define la planilla.
+  const personal=!!S.db&&!S.admin&&!!S.uid;$("#cYo").disabled=personal;if(personal)$("#cYo").value=S.uid;
 }
 function renderAll(){renderKpis();renderList();if(S.view==="consolidado")renderConsol();if(S.view==="clientes")renderClientes();if(S.view==="ubicaciones")renderUb();if(S.view==="ruteo")renderRuteo();if(S.ed)updEdTotals();else renderEditor()}
 
@@ -1887,13 +1938,13 @@ $("#cUrl").value=Con.url;$("#cKey").value=Con.k;$("#cYo").value=Con.yo;
 $("#cSave").addEventListener("click",async()=>{
   const url=$("#cUrl").value.trim(),k=$("#cKey").value.trim(),yo=$("#cYo").value.trim();
   if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)){$("#cOut").textContent="El link tiene que empezar con https://script.google.com/ y terminar en /exec";return}
-  if(!yo){$("#cOut").textContent="Poné tu nombre";return}
   const cambio=url!==Con.url;Object.assign(Con,{url,k,yo});$("#cOut").textContent="Probando…";
-  try{const t0=performance.now();const j=await call("ping");
+  try{const t0=performance.now();const j=await quienSoy();
     if(!(j.version>=2)){$("#cOut").textContent="La planilla tiene el Code.gs viejo: pegá el nuevo y hacé una implementación nueva (ver LEEME).";return}
-    lsSet("rt_con",Con);$("#cOut").textContent=`Conectada a "${j.hoja}" en ${((performance.now()-t0)/1000).toFixed(1)} s`;
+    if(S.admin&&!yo){$("#cOut").textContent="Con la clave de administrador, poné tu nombre";return}
+    lsSet("rt_con",Con);$("#cOut").textContent=`Conectada a "${j.hoja}" en ${((performance.now()-t0)/1000).toFixed(1)} s como ${S.uid}`;
     if(cambio){S.v={};try{localStorage.removeItem("pa_cache")}catch(e){}}
-    S.db=true;S.uid=yo;renderBanners();$("#con").open=false;await sync();loadHist()}
+    S.db=true;renderBanners();$("#con").open=false;await sync();loadHist()}
   catch(e){$("#cOut").textContent="No se pudo conectar: "+e.message}
 });
 // Actualización automática cada 15 s con la pestaña visible, y al volver a ella.
@@ -1906,7 +1957,8 @@ if(Con.url&&Con.k){
   // Arranque rápido con lo guardado en este navegador; después se baja solo lo que cambió.
   const c=lsGet("pa_cache",null);
   if(c){try{if(c.maestro){applyMaestro(c.maestro);S.v.m=c.vm}if(c.geo){S.geo=c.geo;S.v.g=c.vg}if(c.prod){applyProd(c.prod);S.v.p=c.vp}if(c.suc){applySuc(c.suc);applyProv(c.prov);S.v.s=c.vs}}catch(e){S.v={}}renderAll();renderDatos()}
-  renderBanners();sync();loadHist();
+  renderBanners();
+  quienSoy().catch(e=>{setSync(false,e.message);if(/Clave incorrecta|desactivado/.test(e.message)){S.db=null;renderBanners();$("#con").open=true;$("#cOut").textContent=e.message}}).finally(()=>{if(S.db){sync();loadHist()}});
 }else{setSync(false,"Sin conectar");$("#con").open=true}
 })();
 </script>
