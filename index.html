@@ -92,6 +92,8 @@ main{padding-block:16px 60px}
 .search input:focus{border-color:var(--verde);outline:none}
 .sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.14);z-index:15;max-height:360px;overflow:auto}
 .sg{display:flex;gap:10px;padding:9px 12px;cursor:pointer;align-items:baseline;border-bottom:1px solid var(--line)}
+.sg.sgnuevo{position:sticky;bottom:0;background:var(--surface-2);border-top:1px solid var(--line)} /* siempre a la vista, aunque haya muchos resultados */
+.sg.sgnuevo[aria-selected="true"]{background:var(--accent-soft)}
 .sg:last-child{border-bottom:0}
 .sg[aria-selected="true"]{background:var(--accent-soft)}
 .sg .n{font-weight:800}
@@ -319,6 +321,7 @@ a.btn{text-decoration:none;display:inline-block}
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
             <input id="cliQ" autocomplete="off" placeholder="Buscar cliente por nombre, ID o ciudad…" aria-label="Buscar cliente" role="combobox" aria-expanded="false" aria-controls="sugg">
             <div class="sugg" id="sugg" role="listbox" hidden></div>
+            <div class="note" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">¿Todavía no está dado de alta en el sistema? <button type="button" class="btn sm" id="provNew">+ Cliente nuevo (provisorio)</button></div>
           </div>
           <div id="cliCard" hidden></div>
           <div id="edBody"></div>
@@ -635,7 +638,7 @@ function renderSugg(){
   if(!q.trim()){box.hidden=true;$("#cliQ").setAttribute("aria-expanded","false");return}
   suggIdx=Math.min(suggIdx,suggList.length-1);
   box.innerHTML=(suggList.length===1?`<div class="sg"><span class="muted">${S.clientesSis.length?"Sin coincidencias":"La base de clientes todavía no está cargada (pestaña Datos)"}</span></div>`:"")+suggList.map((c,i)=>{
-    if(c.nuevo)return `<div class="sg" role="option" data-i="${i}" aria-selected="${i===suggIdx}"><span class="n" style="color:var(--accent-ink)">+ Cliente nuevo (provisorio)</span><span class="m">no está en el sistema todavía</span></div>`;
+    if(c.nuevo)return `<div class="sg sgnuevo" role="option" data-i="${i}" aria-selected="${i===suggIdx}"><span class="n" style="color:var(--accent-ink)">+ Cliente nuevo (provisorio)</span><span class="m">no está en el sistema todavía</span></div>`;
     const np=pedidosDe(c.id).length,ns=sucsOf(c.id).length;
     const tag=(c.prov?`<span class="chip st warn">Provisorio</span> `:"")+(np?`<span class="chip acc">ya pidió${ns?" ("+np+" de "+(ns+1)+")":""}</span>`:"")+(ns?` <span class="chip">${ns+1} sucursales</span>`:"");
     return `<div class="sg" role="option" data-i="${i}" aria-selected="${i===suggIdx}"><span class="n">${esc(c.nom)}</span> ${tag}<span class="m">#${esc(c.id)} · ${esc(c.ciu||"")}</span></div>`}).join("");
@@ -651,6 +654,7 @@ $("#cliQ").addEventListener("keydown",e=>{
 });
 $("#cliQ").addEventListener("blur",()=>setTimeout(()=>$("#sugg").hidden=true,150));
 $("#sugg").addEventListener("mousedown",e=>{const el=e.target.closest(".sg[data-i]");if(el){e.preventDefault();S.fromList=false;pickSugg(suggList[+el.dataset.i])}});
+$("#provNew").addEventListener("click",()=>pickSugg({nuevo:true}));
 function pickSugg(x){if(!x)return;if(!x.nuevo){pickClient(x);return}
   const q=$("#cliQ").value.trim();$("#cliQ").value="";$("#sugg").hidden=true;S.provForm={nombre:q.toUpperCase()};renderEditor()}
 $("#edBody").addEventListener("input",e=>{const k=e.target.dataset.pf;if(k&&S.provForm)S.provForm[k]=e.target.value});
