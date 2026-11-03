@@ -105,6 +105,11 @@ main{padding-block:16px 60px}
 .cli .nm{font-weight:800;font-size:19px;line-height:1.2}
 .cli .ad{color:var(--muted);font-size:13px}
 .facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.loginov{position:fixed;inset:0;z-index:3000;background:var(--bg);display:grid;place-items:center;padding:16px;overflow:auto}
+#passov{background:rgba(0,0,0,.45)}
+.logcard{width:min(400px,100%);overflow:hidden}
+.loghead{background:var(--verde);color:#fff;padding:18px 16px;display:flex;flex-direction:column;gap:2px;border-bottom:3px solid var(--amarillo)}
+.loghead b{font-size:20px;letter-spacing:1.5px}.loghead span{font-size:12px;font-weight:700;letter-spacing:1.5px}
 .sucbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding:8px 10px;border-radius:var(--r);background:var(--surface-2)}
 .sucf{margin-top:8px;padding:10px;border:1.5px dashed var(--verde-claro);border-radius:var(--r)}
 /* filas de productos */
@@ -284,7 +289,7 @@ a.btn{text-decoration:none;display:inline-block}
         <button class="iconbtn" id="dNext" aria-label="Día siguiente">›</button>
         <div class="dl" id="dLabel"></div>
       </div>
-      <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Sin conectar</span><span id="yoTxt"></span><button class="btn sm" id="reload">Actualizar</button><button class="btn sm" id="openCon">Conexión</button></div>
+      <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Sin conectar</span><span id="yoTxt"></span><button class="btn sm" id="reload">Actualizar</button><button class="btn sm" id="openCon" hidden>Conexión</button><button class="btn sm" id="mPass" hidden>Cambiar contraseña</button><button class="btn sm" id="logout" hidden>Salir</button></div>
     </div>
     <div class="kpis" id="kpis"></div>
     <nav class="tabs" role="tablist">
@@ -299,7 +304,7 @@ a.btn{text-decoration:none;display:inline-block}
 </header>
 
 <main class="wrap">
-  <details class="panel" id="con" style="margin-bottom:18px">
+  <details class="panel" id="con" style="margin-bottom:18px" hidden>
     <summary class="ph" style="cursor:pointer;list-style:none"><h2>Conexión con la planilla</h2><span class="sp"></span><span class="note" id="conInfo"></span></summary>
     <div class="pb" style="display:flex;flex-direction:column;gap:14px">
       <div class="con">
@@ -453,8 +458,8 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
     <div class="panel" style="margin-top:18px" id="usrPanel" hidden>
       <div class="ph"><h2>Usuarios</h2><span class="chip" id="usrCnt">0</span><span class="sp"></span><span class="note">Solo lo ven los administradores</span></div>
-      <div class="pb note">Cada persona entra con su <b>link personal</b>: lo abre y listo, sin cargar link, clave ni nombre. Lo que hace queda con su nombre. Si alguien deja de usar la app, tocá <b>Desactivar</b>; <b>Nuevo link</b> invalida el anterior (por ejemplo, si se compartió por error). Los cambios tardan hasta un minuto en aplicarse.</div>
-      <div class="pb clrow" style="padding-top:0"><input class="inp" id="usrNom" placeholder="Nombre de la persona" style="width:220px"><select class="inp" id="usrRol" style="width:auto"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select><button class="btn sm pri" id="usrAdd">Crear link</button><span class="note" id="usrOut"></span></div>
+      <div class="pb note">Cada persona entra en <b>https://aviguri.github.io/pedidos/</b> con su <b>usuario y contraseña</b>; lo que hace queda con su nombre. Creá el usuario con una contraseña inicial y pasásela: después la puede cambiar desde <b>Cambiar contraseña</b>. Si se la olvida, poné una nueva acá (se cierran sus sesiones abiertas). <b>Desactivar</b> corta su acceso. Los cambios tardan hasta un minuto en aplicarse.</div>
+      <div class="pb clrow" style="padding-top:0"><input class="inp" id="usrNom" placeholder="Nombre (ej. Camila Pérez)" style="width:200px"><input class="inp" id="usrLog" placeholder="Usuario (ej. camila)" style="width:150px" autocapitalize="none" spellcheck="false"><input class="inp" id="usrPass" placeholder="Contraseña inicial" style="width:150px"><button class="btn sm" id="usrGen" type="button" title="Inventa una contraseña">Generar</button><select class="inp" id="usrRol" style="width:auto"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select><button class="btn sm pri" id="usrAdd">Crear usuario</button><span class="note" id="usrOut"></span></div>
       <div class="tblwrap"><table id="usrTbl"></table></div>
     </div>
     <div class="panel" style="margin-top:18px">
@@ -469,6 +474,33 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
   </section>
 </main>
+<div class="loginov" id="login" hidden>
+  <form class="panel logcard" id="loginForm" autocomplete="on">
+    <div class="loghead"><b>GRUPO CTS</b><span>PEDIDOS AVIGURI</span></div>
+    <div class="pb" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px">Ingresar</h2>
+      <label class="lbl" style="display:flex;flex-direction:column;gap:4px">Usuario<input class="inp" id="lgUsr" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <label class="lbl" style="display:flex;flex-direction:column;gap:4px">Contraseña<input class="inp" id="lgPass" name="password" type="password" autocomplete="current-password"></label>
+      <button class="btn pri" type="submit" id="lgBtn">Ingresar</button>
+      <div class="note" id="lgOut" style="min-height:18px;color:var(--danger);font-weight:700"></div>
+      <div class="note">¿No tenés usuario o te olvidaste la contraseña? Pedíselo al administrador.</div>
+      <button type="button" class="btn sm" id="lgTec" style="align-self:flex-start;border-color:var(--line);color:var(--muted)">Acceso técnico (administrador)</button>
+    </div>
+  </form>
+</div>
+<div class="loginov" id="passov" hidden>
+  <form class="panel logcard" id="passForm">
+    <div class="ph"><h2>Cambiar contraseña</h2></div>
+    <div class="pb" style="display:flex;flex-direction:column;gap:12px">
+      <label class="lbl" style="display:flex;flex-direction:column;gap:4px">Contraseña actual<input class="inp" id="cpAct" type="password" autocomplete="current-password"></label>
+      <label class="lbl" style="display:flex;flex-direction:column;gap:4px">Contraseña nueva (mínimo 6)<input class="inp" id="cpNue" type="password" autocomplete="new-password"></label>
+      <label class="lbl" style="display:flex;flex-direction:column;gap:4px">Repetí la nueva<input class="inp" id="cpRep" type="password" autocomplete="new-password"></label>
+      <div class="note" id="cpOut" style="min-height:18px;color:var(--danger);font-weight:700"></div>
+      <div class="clrow"><span style="flex:1"></span><button type="button" class="btn" id="cpNo">Cancelar</button><button type="submit" class="btn pri">Guardar</button></div>
+      <div class="note">Al cambiarla se cierra tu sesión en los otros equipos.</div>
+    </div>
+  </form>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -499,7 +531,10 @@ const S={
 /* ---------- conexión con la planilla (puente Apps Script) ---------- */
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}};
+// Dirección del puente de la planilla. Es pública a propósito (decisión de Gere, 03/11): sin usuario y contraseña no da acceso a nada.
+const APP_URL="https://script.google.com/macros/s/AKfycbwCWHtCZkj1Wqdk6oHxp831mWu6SvHEOHBcn-NGKCvdhIC0o5k1gh9tBSqGe4TkLeqXWg/exec";
 const Con=Object.assign({url:"",k:"",yo:""},lsGet("rt_con",{}));
+if(!Con.url)Con.url=APP_URL;
 // Link personal: …/pedidos/#u=<id de la implementación>&k=<clave>. Se guarda en este navegador y se borra de la barra de direcciones.
 (function(){const h=new URLSearchParams(location.hash.slice(1));const u=h.get("u"),k=h.get("k");if(!u||!k)return;
   const url="https://script.google.com/macros/s/"+u+"/exec";if(url!==Con.url){try{localStorage.removeItem("pa_cache")}catch(e){}}
@@ -508,9 +543,28 @@ const Con=Object.assign({url:"",k:"",yo:""},lsGet("rt_con",{}));
 addEventListener("hashchange",()=>{if(/[#&]k=/.test(location.hash))location.reload()});
 S.admin=false;
 // Pregunta a la planilla quién es el dueño de la clave. Con link personal, el nombre lo da la planilla.
+/* Ingreso con usuario y contraseña: la planilla devuelve un token de sesión que queda en este navegador hasta "Salir". */
+function mostrarLogin(msg){$("#login").hidden=false;$("#lgOut").textContent=msg||"";setTimeout(()=>$("#lgUsr").focus(),50)}
+$("#loginForm").addEventListener("submit",async e=>{e.preventDefault();
+  const usuario=$("#lgUsr").value.trim(),pass=$("#lgPass").value;if(!usuario||!pass){$("#lgOut").textContent="Ingresá usuario y contraseña";return}
+  $("#lgBtn").disabled=true;$("#lgOut").textContent="";const url=Con.url||APP_URL;
+  try{const r=await fetch(url,{method:"POST",body:JSON.stringify({a:"login",usuario,pass})});const j=await r.json();
+    if(!j.ok){$("#lgOut").textContent=/desconocida/.test(j.error||"")?"La planilla tiene una versión vieja del puente (Code.gs). Avisale al administrador.":j.error;$("#lgBtn").disabled=false;return}
+    if(url!==Con.url||!Con.k){try{localStorage.removeItem("pa_cache")}catch(e2){}}
+    Object.assign(Con,{url,k:j.k,yo:""});lsSet("rt_con",Con);location.reload()}
+  catch(err){$("#lgOut").textContent="No hay conexión con la planilla. Revisá internet y probá de nuevo.";$("#lgBtn").disabled=false}});
+$("#lgTec").addEventListener("click",()=>{$("#login").hidden=true;S.tecnico=true;renderBanners();$("#con").open=true});
+$("#logout").addEventListener("click",()=>{Con.k="";Con.yo="";lsSet("rt_con",Con);try{localStorage.removeItem("pa_cache")}catch(e){}location.reload()});
+$("#mPass").addEventListener("click",()=>{$("#passov").hidden=false;["#cpAct","#cpNue","#cpRep"].forEach(s=>$(s).value="");$("#cpOut").textContent="";$("#cpAct").focus()});
+$("#cpNo").addEventListener("click",()=>{$("#passov").hidden=true});
+$("#passForm").addEventListener("submit",async e=>{e.preventDefault();const a=$("#cpAct").value,n=$("#cpNue").value,r=$("#cpRep").value;
+  if(n.length<6){$("#cpOut").textContent="La nueva tiene que tener al menos 6 caracteres";return}
+  if(n!==r){$("#cpOut").textContent="Las dos contraseñas nuevas no coinciden";return}
+  try{const j=await call("cambiarPass",{actual:a,nueva:n});Con.k=j.k;lsSet("rt_con",Con);$("#passov").hidden=true;toast("Contraseña cambiada")}
+  catch(err){$("#cpOut").textContent=err.message}});
 async function quienSoy(){
-  const j=await call("ping");const u=j.usuario||{nombre:Con.yo,admin:true};
-  S.admin=!!u.admin;S.ver=j.version||0;
+  const j=await call("ping");const u=j.usuario||{nombre:Con.yo,admin:true,maestra:true};
+  S.admin=!!u.admin;S.maestra=!!u.maestra;S.ver=j.version||0;
   if(!u.admin){Con.yo=u.nombre;lsSet("rt_con",Con)}
   S.uid=u.admin?(Con.yo||null):u.nombre;
   renderBanners();renderUsuarios();return j;
@@ -520,7 +574,10 @@ async function call(a,p){
   let r;try{r=await fetch(Con.url,{method:"POST",body:JSON.stringify(Object.assign({k:Con.k,a,por:Con.yo},p||{}))})}
   catch(e){throw new Error("Sin conexión con la planilla. Revisá internet y probá de nuevo.")}
   if(!r.ok)throw new Error("La planilla respondió "+r.status);
-  const j=await r.json();if(!j.ok){const e=new Error(j.error||"Error de la planilla");e.codigo=j.codigo;e.actual=j.actual;throw e}return j;
+  const j=await r.json();if(!j.ok){const e=new Error(j.error||"Error de la planilla");e.codigo=j.codigo;e.actual=j.actual;
+    // Sesión vencida (le cambiaron la contraseña o lo desactivaron): vuelve a la pantalla de ingreso.
+    if(j.codigo==="sesion"&&!S.tecnico){Con.k="";lsSet("rt_con",Con);S.db=null;renderBanners();mostrarLogin(j.error)}
+    throw e}return j;
 }
 // Pedidos cargados en el artifact: los autores quedaron con su ID de claude.ai.
 const LEGACY={"u_KTdfQdoAF4n7AZwEolul6g":"Gere","u_vwb0H4p0caiCJFNm48U6SQ":"Cami"};
@@ -1071,33 +1128,40 @@ function renderSucList(){
     :`<tbody><tr><td><div class="empty"><b>Todavía no hay sucursales cargadas</b>En Pedidos, buscá al cliente y tocá + Sucursal.</div></td></tr></tbody>`;
 }
 $("#sucInact").addEventListener("change",renderSucList);
-/* Usuarios (solo administradores): crear, copiar el link personal, desactivar o renovar. */
-S.users=null;let usrArmed={};
-const linkBase=()=>location.protocol.startsWith("http")?location.origin+location.pathname:"https://aviguri.github.io/pedidos/";
-function linkDe(u){const m=String(Con.url).match(/\/s\/([^/]+)\/exec/);return m?`${linkBase()}#u=${m[1]}&k=${u.clave}`:""}
+/* Usuarios (solo administradores): alta con usuario y contraseña inicial, contraseña nueva, rol y desactivar. */
+S.users=null;
+const sugerirLogin=n=>norm(String(n).trim().split(/\s+/)[0]||"").toLowerCase().replace(/[^a-z0-9._-]/g,"");
+const genPass=()=>{const c="abcdefghjkmnpqrstuvwxyz23456789";let s="";const r=crypto.getRandomValues(new Uint32Array(8));for(const x of r)s+=c[x%c.length];return s};
+const msgAcceso=(u,pass)=>`Hola ${u.nombre}! Tu acceso a Pedidos AVIGURI:\nhttps://aviguri.github.io/pedidos/\nUsuario: ${u.usuario}\nContraseña: ${pass}\nDespués podés cambiarla desde "Cambiar contraseña".`;
 async function renderUsuarios(recargar){
   $("#usrPanel").hidden=!S.admin;if(!S.admin)return;
-  if(!(S.ver>=5)){$("#usrTbl").innerHTML=`<tbody><tr><td><div class="banner warn">Para los links personales hay que actualizar Code.gs (versión 5) en Apps Script y hacer una nueva versión de la implementación.</div></td></tr></tbody>`;return}
+  if(!(S.ver>=6)){$("#usrTbl").innerHTML=`<tbody><tr><td><div class="banner warn">Para usuarios con contraseña hay que actualizar Code.gs (versión 6) en Apps Script y hacer una nueva versión de la implementación.</div></td></tr></tbody>`;return}
   if(recargar||!S.users){try{S.users=(await call("listarUsuarios")).usuarios}catch(e){$("#usrOut").textContent=e.message;return}}
+  if($("#usrTbl").contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
   const us=S.users.slice().sort((a,b)=>(b.activo-a.activo)||a.nombre.localeCompare(b.nombre));
   $("#usrCnt").textContent=us.filter(u=>u.activo).length;
-  $("#usrTbl").innerHTML=us.length?`<thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último uso</th><th></th></tr></thead><tbody>${us.map(u=>{const n=esc(u.nombre);const arm=usrArmed[u.nombre];
-    return `<tr${u.activo?"":' style="opacity:.55"'}><td><b>${n}</b><div class="note">desde ${esc(dShort(u.alta))}</div></td><td>${u.rol==="admin"?'<span class="chip acc">Administrador</span>':"Usuario"}</td>
+  $("#usrTbl").innerHTML=us.length?`<thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último uso</th><th>Contraseña nueva</th><th></th></tr></thead><tbody>${us.map(u=>{const n=esc(u.nombre);
+    return `<tr${u.activo?"":' style="opacity:.55"'}><td><b>${n}</b><div class="note">desde ${esc(dShort(u.alta))}</div></td><td><code>${esc(u.usuario||"—")}</code>${u.tienePass?"":' <span class="chip st warn">sin contraseña</span>'}</td>
+      <td>${u.rol==="admin"?'<span class="chip acc">Administrador</span>':"Usuario"}</td>
       <td>${u.activo?'<span class="chip st ok">Activo</span>':'<span class="chip st dng">Desactivado</span>'}</td><td class="note">${u.ultimoUso?esc(hhmm(Date.parse(u.ultimoUso))):"—"}</td>
-      <td><div class="clrow">${u.activo?`<button class="btn sm pri" data-ulink="${n}">Copiar link</button><button class="btn sm" data-umsg="${n}">Copiar mensaje</button>`:""}
-        ${arm==="renovar"?`<button class="btn sm dng" data-urenok="${n}">Confirmar nuevo link</button>`:`<button class="btn sm" data-uren="${n}" title="El link anterior deja de funcionar">Nuevo link</button>`}
-        <button class="btn sm${u.activo?" dng":""}" data-uact="${n}">${u.activo?"Desactivar":"Activar"}</button></div></td></tr>`}).join("")}</tbody>`
-    :`<tbody><tr><td><div class="empty"><b>Todavía no hay usuarios</b>Escribí un nombre arriba y tocá Crear link.</div></td></tr></tbody>`;
+      <td><div class="clrow" style="flex-wrap:nowrap"><input class="inp" data-upass="${n}" placeholder="nueva" style="width:110px"><button class="btn sm" data-ugen="${n}" title="Inventa una">Generar</button><button class="btn sm pri" data-uset="${n}">Guardar</button></div></td>
+      <td><button class="btn sm${u.activo?" dng":""}" data-uact="${n}">${u.activo?"Desactivar":"Activar"}</button></td></tr>`}).join("")}</tbody>`
+    :`<tbody><tr><td><div class="empty"><b>Todavía no hay usuarios</b>Completá nombre, usuario y contraseña arriba y tocá Crear usuario.</div></td></tr></tbody>`;
 }
-async function guardarUsr(user,okMsg){try{const j=await call("guardarUsuario",{user});const u=j.usuario;S.users=(S.users||[]).filter(x=>x.nombre!==u.nombre).concat([u]);usrArmed={};renderUsuarios();if(okMsg)toast(okMsg);return u}catch(e){toast(e.message)}}
-$("#usrAdd").addEventListener("click",async()=>{const nombre=$("#usrNom").value.trim();if(!nombre){toast("Escribí el nombre");return}
+async function guardarUsr(user,okMsg){try{const j=await call("guardarUsuario",{user});const u=j.usuario;S.users=(S.users||[]).filter(x=>x.nombre!==u.nombre).concat([u]);document.activeElement&&document.activeElement.blur();renderUsuarios();if(okMsg)toast(okMsg);return u}catch(e){toast(e.message)}}
+$("#usrNom").addEventListener("input",()=>{if(!$("#usrLog").dataset.tocado)$("#usrLog").value=sugerirLogin($("#usrNom").value)});
+$("#usrLog").addEventListener("input",()=>{$("#usrLog").dataset.tocado="1"});
+$("#usrGen").addEventListener("click",()=>{$("#usrPass").value=genPass()});
+$("#usrAdd").addEventListener("click",async()=>{const nombre=$("#usrNom").value.trim(),usuario=$("#usrLog").value.trim(),pass=$("#usrPass").value;
+  if(!nombre||!usuario||!pass){toast("Completá nombre, usuario y contraseña");return}if(pass.length<6){toast("La contraseña tiene que tener al menos 6 caracteres");return}
   if((S.users||[]).some(u=>u.nombre.toLowerCase()===nombre.toLowerCase())){toast("Ya existe un usuario con ese nombre");return}
-  const u=await guardarUsr({nombre,rol:$("#usrRol").value},"Usuario creado");if(u){$("#usrNom").value="";copyText(linkDe(u),"Link de "+u.nombre+" copiado: pasáselo por WhatsApp")}});
+  const u=await guardarUsr({nombre,usuario,pass,rol:$("#usrRol").value});
+  if(u){["#usrNom","#usrLog","#usrPass"].forEach(s=>$(s).value="");delete $("#usrLog").dataset.tocado;copyText(msgAcceso(u,pass),"Usuario creado. Mensaje con el acceso copiado para WhatsApp")}});
 $("#usrTbl").addEventListener("click",e=>{const g=a=>e.target.closest(`[${a}]`);const find=n=>(S.users||[]).find(u=>u.nombre===n);let b;
-  if((b=g("data-ulink"))){const u=find(b.dataset.ulink);copyText(linkDe(u),"Link de "+u.nombre+" copiado");return}
-  if((b=g("data-umsg"))){const u=find(b.dataset.umsg);copyText(`Hola ${u.nombre}! Este es tu acceso a Pedidos AVIGURI:\n${linkDe(u)}\nAbrilo desde la PC o el celular donde vas a trabajar. Es personal: no lo compartas.`,"Mensaje copiado para WhatsApp");return}
-  if((b=g("data-uren"))){usrArmed={[b.dataset.uren]:"renovar"};renderUsuarios();return}
-  if((b=g("data-urenok"))){guardarUsr({nombre:b.dataset.urenok,renovar:true},"Nuevo link generado: el anterior ya no funciona").then(u=>u&&copyText(linkDe(u),"Nuevo link de "+u.nombre+" copiado"));return}
+  const inp=n=>document.querySelector(`[data-upass="${CSS.escape(n)}"]`);
+  if((b=g("data-ugen"))){inp(b.dataset.ugen).value=genPass();return}
+  if((b=g("data-uset"))){const n=b.dataset.uset,p=inp(n).value;if(p.length<6){toast("La contraseña tiene que tener al menos 6 caracteres");return}
+    guardarUsr({nombre:n,pass:p}).then(u=>u&&copyText(msgAcceso(u,p),"Contraseña nueva guardada. Mensaje copiado para WhatsApp"));return}
   if((b=g("data-uact"))){const u=find(b.dataset.uact);guardarUsr({nombre:u.nombre,activo:!u.activo},u.activo?u.nombre+" desactivado":u.nombre+" activado")}});
 // Candidatos para vincular: clientes del sistema que comparten palabras del nombre o de la dirección, priorizando altas recientes.
 const STOP=new Set(["DE","DEL","LA","LAS","LOS","EL","Y","SRL","SA","SAS","CALLE","AV","AVENIDA"]);
@@ -1926,6 +1990,9 @@ function renderBanners(){
   $("#conInfo").textContent=S.db?"Conectada"+(S.uid?" · "+S.uid:"")+(S.admin?" · administrador":""):"Sin configurar";
   // Con link personal el nombre lo define la planilla.
   const personal=!!S.db&&!S.admin&&!!S.uid;$("#cYo").disabled=personal;if(personal)$("#cYo").value=S.uid;
+  // Conexión (link y clave) solo para administradores o desde "Acceso técnico". Los usuarios ven su nombre, Cambiar contraseña y Salir.
+  const verCon=S.admin||S.tecnico;$("#con").hidden=!verCon;$("#openCon").hidden=!verCon;
+  $("#logout").hidden=!S.db;$("#mPass").hidden=!S.db||S.maestra||!(S.ver>=6);
 }
 function renderAll(){renderKpis();renderList();if(S.view==="consolidado")renderConsol();if(S.view==="clientes")renderClientes();if(S.view==="ubicaciones")renderUb();if(S.view==="ruteo")renderRuteo();if(S.ed)updEdTotals();else renderEditor()}
 
@@ -1962,8 +2029,8 @@ if(Con.url&&Con.k){
   const c=lsGet("pa_cache",null);
   if(c){try{if(c.maestro){applyMaestro(c.maestro);S.v.m=c.vm}if(c.geo){S.geo=c.geo;S.v.g=c.vg}if(c.prod){applyProd(c.prod);S.v.p=c.vp}if(c.suc){applySuc(c.suc);applyProv(c.prov);S.v.s=c.vs}}catch(e){S.v={}}renderAll();renderDatos()}
   renderBanners();
-  quienSoy().catch(e=>{setSync(false,e.message);if(/Clave incorrecta|desactivado/.test(e.message)){S.db=null;renderBanners();$("#con").open=true;$("#cOut").textContent=e.message}}).finally(()=>{if(S.db){sync();loadHist()}});
-}else{setSync(false,"Sin conectar");$("#con").open=true}
+  quienSoy().catch(e=>{setSync(false,e.message);if(e.codigo==="sesion"||/Clave incorrecta|desactivado/.test(e.message)){S.db=null;Con.k="";lsSet("rt_con",Con);renderBanners();mostrarLogin(e.message)}}).finally(()=>{if(S.db){sync();loadHist()}});
+}else{setSync(false,"Sin conectar");mostrarLogin()}
 })();
 </script>
 </body>
