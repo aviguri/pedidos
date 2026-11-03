@@ -460,6 +460,7 @@ a.btn{text-decoration:none;display:inline-block}
       <div class="ph"><h2>Usuarios</h2><span class="chip" id="usrCnt">0</span><span class="sp"></span><span class="note">Solo lo ven los administradores</span></div>
       <div class="pb note">Cada persona entra en <b>https://aviguri.github.io/pedidos/</b> con su <b>usuario y contraseña</b>; lo que hace queda con su nombre. Creá el usuario con una contraseña inicial y pasásela: después la puede cambiar desde <b>Cambiar contraseña</b>. Si se la olvida, poné una nueva acá (se cierran sus sesiones abiertas). <b>Desactivar</b> corta su acceso. Los cambios tardan hasta un minuto en aplicarse.</div>
       <div class="pb clrow" style="padding-top:0"><input class="inp" id="usrNom" placeholder="Nombre (ej. Camila Pérez)" style="width:200px"><input class="inp" id="usrLog" placeholder="Usuario (ej. camila)" style="width:150px" autocapitalize="none" spellcheck="false"><input class="inp" id="usrPass" placeholder="Contraseña inicial" style="width:150px"><button class="btn sm" id="usrGen" type="button" title="Inventa una contraseña">Generar</button><select class="inp" id="usrRol" style="width:auto"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select><button class="btn sm pri" id="usrAdd">Crear usuario</button><span class="note" id="usrOut"></span></div>
+      <div class="pb" id="usrAcceso" hidden style="padding-top:0"></div>
       <div class="tblwrap"><table id="usrTbl"></table></div>
     </div>
     <div class="panel" style="margin-top:18px">
@@ -1132,7 +1133,14 @@ $("#sucInact").addEventListener("change",renderSucList);
 S.users=null;
 const sugerirLogin=n=>norm(String(n).trim().split(/\s+/)[0]||"").toLowerCase().replace(/[^a-z0-9._-]/g,"");
 const genPass=()=>{const c="abcdefghjkmnpqrstuvwxyz23456789";let s="";const r=crypto.getRandomValues(new Uint32Array(8));for(const x of r)s+=c[x%c.length];return s};
-const msgAcceso=(u,pass)=>`Hola ${u.nombre}! Tu acceso a Pedidos AVIGURI:\nhttps://aviguri.github.io/pedidos/\nUsuario: ${u.usuario}\nContraseña: ${pass}\nDespués podés cambiarla desde "Cambiar contraseña".`;
+const msgAcceso=(u,pass)=>`Hola ${u.nombre}! Tu acceso a Pedidos AVIGURI:\nhttps://aviguri.github.io/pedidos/\nUsuario: ${u.usuario}\n`+(pass?`Contraseña: ${pass}\nDespués podés cambiarla desde "Cambiar contraseña".`:`Contraseña: la que te pasé (si no la tenés, pedime una nueva).`);
+// Caja para compartir el acceso recién creado o reseteado: la contraseña solo se puede mostrar en este momento (después queda cifrada).
+function mostrarAcceso(u,pass){const t=msgAcceso(u,pass);const box=$("#usrAcceso");box.hidden=false;
+  box.innerHTML=`<div class="sucf" style="margin-top:0"><div class="clrow"><b>Acceso de ${esc(u.nombre)}</b><span style="flex:1"></span><button class="btn sm pri" id="accCopy">Copiar</button><button class="btn sm" id="accOk">Listo</button></div>
+    <pre style="margin:8px 0 0;white-space:pre-wrap;font:inherit;font-size:13.5px">${esc(t)}</pre>
+    <div class="note">Copialo y mandáselo por WhatsApp. Cuando toques Listo, la contraseña ya no se vuelve a mostrar.</div></div>`;
+  $("#accCopy").onclick=()=>copyText(t,"Acceso copiado: pegalo en WhatsApp");$("#accOk").onclick=()=>{box.hidden=true;box.innerHTML=""};
+  box.scrollIntoView({block:"nearest",behavior:"smooth"})}
 async function renderUsuarios(recargar){
   $("#usrPanel").hidden=!S.admin;if(!S.admin)return;
   if(!(S.ver>=6)){$("#usrTbl").innerHTML=`<tbody><tr><td><div class="banner warn">Para usuarios con contraseña hay que actualizar Code.gs (versión 6) en Apps Script y hacer una nueva versión de la implementación.</div></td></tr></tbody>`;return}
@@ -1145,7 +1153,7 @@ async function renderUsuarios(recargar){
       <td>${u.rol==="admin"?'<span class="chip acc">Administrador</span>':"Usuario"}</td>
       <td>${u.activo?'<span class="chip st ok">Activo</span>':'<span class="chip st dng">Desactivado</span>'}</td><td class="note">${u.ultimoUso?esc(hhmm(Date.parse(u.ultimoUso))):"—"}</td>
       <td><div class="clrow" style="flex-wrap:nowrap"><input class="inp" data-upass="${n}" placeholder="nueva" style="width:110px"><button class="btn sm" data-ugen="${n}" title="Inventa una">Generar</button><button class="btn sm pri" data-uset="${n}">Guardar</button></div></td>
-      <td><button class="btn sm${u.activo?" dng":""}" data-uact="${n}">${u.activo?"Desactivar":"Activar"}</button></td></tr>`}).join("")}</tbody>`
+      <td><div class="clrow" style="flex-wrap:nowrap">${u.activo&&u.usuario?`<button class="btn sm" data-ucopy="${n}" title="Copia el link y el usuario (la contraseña no se guarda)">Copiar acceso</button>`:""}<button class="btn sm${u.activo?" dng":""}" data-uact="${n}">${u.activo?"Desactivar":"Activar"}</button></div></td></tr>`}).join("")}</tbody>`
     :`<tbody><tr><td><div class="empty"><b>Todavía no hay usuarios</b>Completá nombre, usuario y contraseña arriba y tocá Crear usuario.</div></td></tr></tbody>`;
 }
 async function guardarUsr(user,okMsg){try{const j=await call("guardarUsuario",{user});const u=j.usuario;S.users=(S.users||[]).filter(x=>x.nombre!==u.nombre).concat([u]);document.activeElement&&document.activeElement.blur();renderUsuarios();if(okMsg)toast(okMsg);return u}catch(e){toast(e.message)}}
@@ -1156,12 +1164,13 @@ $("#usrAdd").addEventListener("click",async()=>{const nombre=$("#usrNom").value.
   if(!nombre||!usuario||!pass){toast("Completá nombre, usuario y contraseña");return}if(pass.length<6){toast("La contraseña tiene que tener al menos 6 caracteres");return}
   if((S.users||[]).some(u=>u.nombre.toLowerCase()===nombre.toLowerCase())){toast("Ya existe un usuario con ese nombre");return}
   const u=await guardarUsr({nombre,usuario,pass,rol:$("#usrRol").value});
-  if(u){["#usrNom","#usrLog","#usrPass"].forEach(s=>$(s).value="");delete $("#usrLog").dataset.tocado;copyText(msgAcceso(u,pass),"Usuario creado. Mensaje con el acceso copiado para WhatsApp")}});
+  if(u){["#usrNom","#usrLog","#usrPass"].forEach(s=>$(s).value="");delete $("#usrLog").dataset.tocado;toast("Usuario creado");mostrarAcceso(u,pass)}});
 $("#usrTbl").addEventListener("click",e=>{const g=a=>e.target.closest(`[${a}]`);const find=n=>(S.users||[]).find(u=>u.nombre===n);let b;
   const inp=n=>document.querySelector(`[data-upass="${CSS.escape(n)}"]`);
   if((b=g("data-ugen"))){inp(b.dataset.ugen).value=genPass();return}
   if((b=g("data-uset"))){const n=b.dataset.uset,p=inp(n).value;if(p.length<6){toast("La contraseña tiene que tener al menos 6 caracteres");return}
-    guardarUsr({nombre:n,pass:p}).then(u=>u&&copyText(msgAcceso(u,p),"Contraseña nueva guardada. Mensaje copiado para WhatsApp"));return}
+    guardarUsr({nombre:n,pass:p},"Contraseña nueva guardada").then(u=>u&&mostrarAcceso(u,p));return}
+  if((b=g("data-ucopy"))){const u=find(b.dataset.ucopy);copyText(msgAcceso(u,null),"Link y usuario de "+u.nombre+" copiados");return}
   if((b=g("data-uact"))){const u=find(b.dataset.uact);guardarUsr({nombre:u.nombre,activo:!u.activo},u.activo?u.nombre+" desactivado":u.nombre+" activado")}});
 // Candidatos para vincular: clientes del sistema que comparten palabras del nombre o de la dirección, priorizando altas recientes.
 const STOP=new Set(["DE","DEL","LA","LAS","LOS","EL","Y","SRL","SA","SAS","CALLE","AV","AVENIDA"]);
