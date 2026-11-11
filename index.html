@@ -1565,28 +1565,42 @@ const camById=id=>camiones().find(t=>t.id===id);
 const capTol=t=>(t.capKg||0)*(1+(t.tol||0)/100);
 // Lo que agrega al recorrido meter la parada s en el mejor lugar de arr.
 /* Distancia para rutear, en km por calle. Sale de la matriz de OSRM (router.project-osrm.org) si está pedida para estos puntos;
-   si no, línea recta × factorKm. Todo el armado y los km de las tarjetas usan D(). */
+   si no, línea recta × factorKm. Los km de las tarjetas usan D(); el armado usa C() (minutos por defecto) + zonas. */
 S.mat=null;
 const pk=p=>(+p.lat).toFixed(5)+","+(+p.lon).toFixed(5);
 function D(a,b){const m=S.mat;if(m){const i=m.idx.get(pk(a)),j=m.idx.get(pk(b));if(i!=null&&j!=null){const v=m.km[i][j];if(v!=null)return v}}return hav(a,b)*(S.log.factorKm||1.3)}
+// Minutos de manejo sin tránsito (OSRM). Sin matriz: km estimados a 35 km/h.
+function T(a,b){const m=S.mat;if(m&&m.min){const i=m.idx.get(pk(a)),j=m.idx.get(pk(b));if(i!=null&&j!=null){const v=m.min[i][j];if(v!=null)return v}}return D(a,b)*60/35}
+/* Lo que el armado minimiza: minutos (por defecto) o km, según Depósitos y camiones › Medir en. */
+const C=(a,b)=>S.log.medida==="km"?D(a,b):T(a,b);
+/* Zonas por depósito: localidad → id de depósito. Salir de otro depósito suma una penalidad:
+   "fija" = solo si no entra en los camiones de su depósito; "preferida" = si ahorra más de 30 min. */
+const normCiu=s=>{let x=norm(String(s||"")).toUpperCase().replace(/[.,]/g," ").replace(/\s+/g," ").trim();
+  if(/^(CABA|C A B A|CAPITAL|CIUDAD AUTONOMA( DE BUENOS AIRES)?|CIUDAD DE BUENOS AIRES|CAP FED|CAPITAL FEDERAL)$/.test(x))x="CAPITAL FEDERAL";return x};
+const zonaDe=s=>{const z=S.log.zonas;return z&&s&&s.c?z[normCiu(s.c.ciu)]||"":""};
+const PEN={fija:600,preferida:30,no:0};
+const pen=(dep,s)=>{const z=zonaDe(s);return z&&dep&&z!==dep.id?PEN[S.log.zonaModo||"fija"]||0:0};
 // Pide a OSRM los km por calle entre todos los puntos, en bloques de 50 × 50 (máximo 100 coordenadas por consulta, 1 por segundo).
 async function cargarMatriz(pts){
   const keys=[...new Set(pts.map(pk))];
-  if(S.mat&&keys.every(k=>S.mat.idx.has(k)))return true;
-  const idx=new Map(keys.map((k,i)=>[k,i]));const km=keys.map(()=>new Array(keys.length).fill(null));const B=keys.length<=100?100:50;
+  if(S.mat&&S.mat.min&&keys.every(k=>S.mat.idx.has(k)))return true;
+  const idx=new Map(keys.map((k,i)=>[k,i]));const km=keys.map(()=>new Array(keys.length).fill(null)),min=keys.map(()=>new Array(keys.length).fill(null));const B=keys.length<=100?100:50;
   const ll=k=>{const [la,lo]=k.split(",");return lo+","+la};
   try{for(let a=0;a<keys.length;a+=B)for(let b=0;b<keys.length;b+=B){
       const A=keys.slice(a,a+B),Bk=keys.slice(b,b+B);const coords=a===b?A:[...A,...Bk];
       const src=A.map((_,i)=>i).join(";"),dst=(a===b?A.map((_,i)=>i):Bk.map((_,i)=>A.length+i)).join(";");
       const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),15000);
-      const r=await fetch(`https://router.project-osrm.org/table/v1/driving/${coords.map(ll).join(";")}?annotations=distance&sources=${src}&destinations=${dst}`,{signal:ctl.signal});clearTimeout(to);
+      const r=await fetch(`https://router.project-osrm.org/table/v1/driving/${coords.map(ll).join(";")}?annotations=distance,duration&sources=${src}&destinations=${dst}`,{signal:ctl.signal});clearTimeout(to);
       const j=await r.json();if(j.code!=="Ok")throw new Error(j.message||j.code);
       j.distances.forEach((row,i)=>row.forEach((v,k)=>{km[a+i][b+k]=v==null?null:v/1000}));
+      j.durations.forEach((row,i)=>row.forEach((v,k)=>{min[a+i][b+k]=v==null?null:v/60}));
       if(keys.length>B)await new Promise(r=>setTimeout(r,1100))}
-    S.mat={idx,km};return true}
+    S.mat={idx,km,min};return true}
   catch(e){return false}
 }
-function insCost(dep,arr,s){let best={pos:0,d:1e9};for(let i=0;i<=arr.length;i++){const a=i?arr[i-1]:dep,b=i<arr.length?arr[i]:dep;const d=D(a,s)+D(s,b)-D(a,b);if(d<best.d)best={pos:i,d}}return best}
+// Costo de meter la parada s en el mejor lugar de arr (minutos o km según la medida, más la penalidad de zona). km = km que agrega.
+function insCost(dep,arr,s){let best={pos:0,d:1e9};for(let i=0;i<=arr.length;i++){const a=i?arr[i-1]:dep,b=i<arr.length?arr[i]:dep;const d=C(a,s)+C(s,b)-C(a,b);if(d<best.d)best={pos:i,d}}
+  const a=best.pos?arr[best.pos-1]:dep,b=best.pos<arr.length?arr[best.pos]:dep;best.km=D(a,s)+D(s,b)-D(a,b);best.min=T(a,s)+T(s,b)-T(a,b);best.pen=pen(dep,s);best.d+=best.pen;return best}
 function rutaStops(){
   // Una parada por lugar de entrega (cliente o sucursal). s.c.nom ya trae el nombre de la sucursal para mostrar.
   const ped=S.dia.pedidos||{};
@@ -1604,19 +1618,22 @@ function classify(stops){
     if(!best||bd>(S.log.interiorKm||150))interior.push(s);else ok.push(s)}
   return {sin,interior,ok};
 }
-function tourLen(dep,arr){if(!arr.length)return 0;let d=D(dep,arr[0]);for(let i=1;i<arr.length;i++)d+=D(arr[i-1],arr[i]);return d+D(arr[arr.length-1],dep)}
+function tourLen(dep,arr,f){f=f||D;if(!arr.length)return 0;let d=f(dep,arr[0]);for(let i=1;i<arr.length;i++)d+=f(arr[i-1],arr[i]);return d+f(arr[arr.length-1],dep)}
+const tourMin=(dep,arr)=>tourLen(dep,arr,T);
+// Lo que minimiza el armado para un camión: recorrido en la medida elegida + penalidades de zona.
+const tourCost=(dep,arr)=>tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0);
 // 2-opt: da vuelta tramos mientras acorte. Con km por calle la ida y la vuelta pueden diferir, así que se cuenta el tramo invertido completo.
 function twoOpt(dep,arr){
   if(arr.length<3)return arr.slice();const pts=[dep,...arr,dep];let improved=true,guard=0;
   while(improved&&guard++<80){improved=false;for(let i=1;i<pts.length-2;i++)for(let k=i+1;k<pts.length-1;k++){
-    let dentro=0,rev=0;for(let x=i;x<k;x++){dentro+=D(pts[x],pts[x+1]);rev+=D(pts[x+1],pts[x])}
-    const delta=D(pts[i-1],pts[k])+D(pts[i],pts[k+1])-D(pts[i-1],pts[i])-D(pts[k],pts[k+1])+rev-dentro;
+    let dentro=0,rev=0;for(let x=i;x<k;x++){dentro+=C(pts[x],pts[x+1]);rev+=C(pts[x+1],pts[x])}
+    const delta=C(pts[i-1],pts[k])+C(pts[i],pts[k+1])-C(pts[i-1],pts[i])-C(pts[k],pts[k+1])+rev-dentro;
     if(delta<-1e-9){pts.splice(i,k-i+1,...pts.slice(i,k+1).reverse());improved=true}}}
   return pts.slice(1,-1);
 }
 function optimizeOrder(dep,arr){
   if(arr.length<3)return twoOpt(dep,arr);const rest=arr.slice();const out=[];let cur=dep;
-  while(rest.length){let bi=0,bd=1e9;rest.forEach((s,i)=>{const k=D(cur,s);if(k<bd){bd=k;bi=i}});cur=rest.splice(bi,1)[0];out.push(cur)}
+  while(rest.length){let bi=0,bd=1e9;rest.forEach((s,i)=>{const k=C(cur,s);if(k<bd){bd=k;bi=i}});cur=rest.splice(bi,1)[0];out.push(cur)}
   return twoOpt(dep,out);
 }
 /* Armado de rutas: lo que manda es el total de km de todos los camiones (por calle si OSRM respondió); la capacidad con tolerancia es un límite.
@@ -1625,8 +1642,11 @@ function optimizeOrder(dep,arr){
    3) Búsqueda local final. Gana la solución que entrega más kg y, a igual kg, la de menos km.
    Búsqueda local: mover un cliente o un tramo de 2-3 paradas a otro camión, intercambiar clientes, 2-opt dentro de cada camión
    y, si quedó gente afuera, cambiarla por clientes que pesen igual o menos y agreguen más km. */
-const removeGain=(dep,arr,i)=>{const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return D(a,arr[i])+D(arr[i],b)-D(a,b)};
-const solKm=R=>R.reduce((a,r)=>a+tourLen(r.dep,r.st),0);
+/* Desde el 11/11 el costo es C() (minutos de manejo por defecto) + penalidad por salir de un depósito que no es el de la zona.
+   En el código el total sigue llamándose "km" por costumbre, pero es ese costo. */
+const removeGain=(dep,arr,i)=>{const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return C(a,arr[i])+C(arr[i],b)-C(a,b)+pen(dep,arr[i])};
+const solKm=R=>R.reduce((a,r)=>a+tourCost(r.dep,r.st),0);
+const solKmReal=R=>R.reduce((a,r)=>a+tourLen(r.dep,r.st),0);
 const solKg=R=>R.reduce((a,r)=>a+r.kg,0);
 const mejorQue=(a,b)=>a.kg>b.kg+1||(Math.abs(a.kg-b.kg)<=1&&a.km<b.km-1e-6);
 const clonar=sol=>({R:sol.R.map(r=>({...r,st:r.st.slice()})),fuera:sol.fuera.slice(),kg:sol.kg,km:sol.km});
@@ -1639,13 +1659,14 @@ function construir(ok,trucks,modo,rnd){
   if(modo==="barato"){let pend=ok.slice();
     while(pend.length){let best=null,bi=-1;pend.forEach((s,i)=>{const b=mejorIns(R,s);if(b&&(!best||b.c.d<best.c.d)){best=b;bi=i}});if(!best)break;poner(best,pend[bi]);pend.splice(bi,1)}
     sol.fuera=pend}
-  else{const depMin=s=>Math.min(...R.map(r=>D(r.dep,s)))*(modo==="azar"?0.7+0.6*rnd():1);
+  else{const depMin=s=>Math.min(...R.map(r=>C(r.dep,s)+pen(r.dep,s)))*(modo==="azar"?0.7+0.6*rnd():1);
     for(const s of ok.map(s=>[depMin(s),s]).sort((a,b)=>b[0]-a[0]).map(v=>v[1])){const b=mejorIns(R,s);if(b)poner(b,s);else sol.fuera.push(s)}}
   return sol;
 }
 function busquedaLocal(sol){
   const R=sol.R,fuera=sol.fuera;let cambio=true,vueltas=0;
-  const inner=seg=>{let d=0;for(let x=0;x<seg.length-1;x++)d+=D(seg[x],seg[x+1]);return d};
+  const inner=seg=>{let d=0;for(let x=0;x<seg.length-1;x++)d+=C(seg[x],seg[x+1]);return d};
+  const penS=(dep,seg)=>seg.reduce((a,s)=>a+pen(dep,s),0);
   while(cambio&&vueltas++<40){cambio=false;
     // Mover un cliente a otro camión.
     for(const A of R)for(let i=0;i<A.st.length;i++){const s=A.st[i];const gan=removeGain(A.dep,A.st,i);let best=null;
@@ -1654,10 +1675,10 @@ function busquedaLocal(sol){
     // Mover un tramo de 2 o 3 paradas seguidas a otro camión (también dado vuelta).
     for(const L of [2,3])for(const A of R)for(let i=0;i+L<=A.st.length;i++){
       const seg=A.st.slice(i,i+L),kgS=seg.reduce((a,s)=>a+s.kg,0);const p=i?A.st[i-1]:A.dep,n=i+L<A.st.length?A.st[i+L]:A.dep;
-      const gan=D(p,seg[0])+inner(seg)+D(seg[L-1],n)-D(p,n);let best=null;
-      for(const B of R){if(B===A||B.kg+kgS>B.cap)continue;
+      const gan=C(p,seg[0])+inner(seg)+C(seg[L-1],n)-C(p,n)+penS(A.dep,seg);let best=null;
+      for(const B of R){if(B===A||B.kg+kgS>B.cap)continue;const pB=penS(B.dep,seg);
         for(const sg of [seg,seg.slice().reverse()]){const inn=inner(sg);
-          for(let j=0;j<=B.st.length;j++){const a=j?B.st[j-1]:B.dep,b=j<B.st.length?B.st[j]:B.dep;const c=D(a,sg[0])+inn+D(sg[L-1],b)-D(a,b);
+          for(let j=0;j<=B.st.length;j++){const a=j?B.st[j-1]:B.dep,b=j<B.st.length?B.st[j]:B.dep;const c=C(a,sg[0])+inn+C(sg[L-1],b)-C(a,b)+pB;
             if(c<gan-0.05&&(!best||c<best.c))best={B,j,sg,c}}}}
       if(best){A.st.splice(i,L);A.kg-=kgS;best.B.st.splice(best.j,0,...best.sg);best.B.kg+=kgS;cambio=true;i--}}
     // Intercambiar dos clientes entre camiones.
@@ -1665,15 +1686,15 @@ function busquedaLocal(sol){
       for(let i=0;i<A.st.length;i++)for(let j=0;j<B.st.length;j++){const s=A.st[i],u=B.st[j];
         if(A.kg-s.kg+u.kg>A.cap||B.kg-u.kg+s.kg>B.cap)continue;
         const pa=i?A.st[i-1]:A.dep,na=i<A.st.length-1?A.st[i+1]:A.dep,pb=j?B.st[j-1]:B.dep,nb=j<B.st.length-1?B.st[j+1]:B.dep;
-        const d=D(pa,u)+D(u,na)-D(pa,s)-D(s,na)+D(pb,s)+D(s,nb)-D(pb,u)-D(u,nb);
+        const d=C(pa,u)+C(u,na)-C(pa,s)-C(s,na)+C(pb,s)+C(s,nb)-C(pb,u)-C(u,nb)+pen(A.dep,u)-pen(A.dep,s)+pen(B.dep,s)-pen(B.dep,u);
         if(d<-0.05){A.st[i]=u;B.st[j]=s;A.kg+=u.kg-s.kg;B.kg+=s.kg-u.kg;cambio=true}}}
-    for(const r of R){const o=twoOpt(r.dep,r.st);if(tourLen(r.dep,o)<tourLen(r.dep,r.st)-0.05){r.st=o;cambio=true}}
+    for(const r of R){const o=twoOpt(r.dep,r.st);if(tourLen(r.dep,o,C)<tourLen(r.dep,r.st,C)-0.05){r.st=o;cambio=true}}
     // Los de afuera entran si hay lugar; si no, se cambian por clientes más livianos o iguales que agreguen más km.
     for(let k=fuera.length-1;k>=0;k--){const b=mejorIns(R,fuera[k]);if(b){poner(b,fuera[k]);fuera.splice(k,1);cambio=true}}
     for(let k=0;k<fuera.length;k++){const u=fuera[k];let hecho=false;
       for(const A of R){for(let i=0;i<A.st.length;i++){const s=A.st[i];if(u.kg<s.kg||A.kg-s.kg+u.kg>A.cap)continue;
         const p=i?A.st[i-1]:A.dep,n=i<A.st.length-1?A.st[i+1]:A.dep;
-        if(D(p,u)+D(u,n)<D(p,s)+D(s,n)-0.5){A.st[i]=u;A.kg+=u.kg-s.kg;fuera[k]=s;cambio=hecho=true;break}}if(hecho)break}}
+        if(C(p,u)+C(u,n)+pen(A.dep,u)<C(p,s)+C(s,n)+pen(A.dep,s)-0.5){A.st[i]=u;A.kg+=u.kg-s.kg;fuera[k]=s;cambio=hecho=true;break}}if(hecho)break}}
   }
   sol.kg=solKg(R);sol.km=solKm(R);return sol;
 }
@@ -1683,7 +1704,7 @@ function romperRearmar(sol0,ok,ms,rnd){
   while(performance.now()-t0<ms){
     const c=clonar(cur);const centro=ok[Math.floor(rnd()*ok.length)];const k=3+Math.floor(rnd()*10);
     const asignados=c.R.flatMap(r=>r.st);
-    const sacar=new Set(asignados.map(s=>[D(centro,s)+D(s,centro),s]).sort((a,b)=>a[0]-b[0]).slice(0,k).map(v=>v[1]));
+    const sacar=new Set(asignados.map(s=>[C(centro,s)+C(s,centro),s]).sort((a,b)=>a[0]-b[0]).slice(0,k).map(v=>v[1]));
     for(const r of c.R){if(r.st.some(s=>sacar.has(s))){r.st=r.st.filter(s=>!sacar.has(s));r.kg=r.st.reduce((a,s)=>a+s.kg,0)}}
     let pool=[...sacar,...c.fuera];c.fuera=[];
     while(pool.length){let best=null,bi=-1;pool.forEach((s,i)=>{const b=mejorIns(c.R,s);if(b&&(!best||b.c.d<best.c.d)){best=b;bi=i}});
@@ -1708,14 +1729,16 @@ async function sugerirRutas(){
     let best=null;
     for(const modo of ["lejos","barato","azar","azar","azar","azar","azar"]){const sol=busquedaLocal(construir(ok,trucks,modo,rnd));if(!best||mejorQue(sol,best))best=sol}
     best=busquedaLocal(romperRearmar(best,ok,2500,rnd));
-    for(const r of best.R){const alt=optimizeOrder(r.dep,r.st);if(tourLen(r.dep,alt)<tourLen(r.dep,r.st))r.st=alt}
-    best.km=solKm(best.R);
+    for(const r of best.R){const alt=optimizeOrder(r.dep,r.st);if(tourLen(r.dep,alt,C)<tourLen(r.dep,r.st,C))r.st=alt}
+    best.km=solKmReal(best.R);const minT=best.R.reduce((a,r)=>a+tourMin(r.dep,r.st),0);
+    const fueraZona=best.R.reduce((a,r)=>a+r.st.filter(s=>pen(r.dep,s)>0).length,0);
     const asig={},orden={};
     for(const r of best.R){if(!r.st.length)continue;orden[r.t.id]=r.st.map(s=>s.id);r.st.forEach(s=>asig[s.id]=r.t.id)}
     best.fuera.forEach(s=>asig[s.id]="none");
     const Rc=rutaCopy();Rc.asig=asig;Rc.orden=orden;saveRuta(Rc);
-    const n=best.fuera.length,km=`~${nf0.format(best.km)} km ${porCalle?"por calle":"estimados (OSRM no respondió: línea recta)"}`;
-    toast(n?`Rutas armadas (${km}). ${n} cliente${n>1?"s":""} no entra${n>1?"n":""}: mirá el aviso de arriba.`:`Rutas armadas · ${km} en total. Revisalas y ajustá lo que haga falta.`);
+    const n=best.fuera.length,km=porCalle?`~${nf0.format(best.km)} km y ${durTxt(Math.round(minT))} de manejo sin tránsito`:`~${nf0.format(best.km)} km estimados (OSRM no respondió: línea recta)`;
+    const fz=fueraZona?` ${fueraZona} cliente${fueraZona>1?"s":""} sale${fueraZona>1?"n":""} de otro depósito que el de su zona.`:"";
+    toast((n?`Rutas armadas (${km}). ${n} cliente${n>1?"s":""} no entra${n>1?"n":""}: mirá el aviso de arriba.`:`Rutas armadas · ${km} en total.`)+fz);
     setSync(true,"Sincronizado · "+horaCorta());
   }finally{armando=false;const b=$("#rtSug");if(b){b.disabled=false;b.textContent="Armar rutas sugeridas"}}
 }
@@ -1929,8 +1952,9 @@ function renderRuteo(force){
   const opts=cur=>`<option value="none"${cur==="none"?" selected":""}>Sin camión</option>`+camiones().map(t=>`<option value="${esc(t.id)}"${cur===t.id?" selected":""}>${esc(t.nombre)} · ${esc(t.dep.nombre)}</option>`).join("");
   const calChip=s=>s.g.cal==="ciudad"?' <span class="chip st warn">aprox.</span>':s.g.cal==="manual"?` <span class="chip st ok">manual</span> <button class="btn sm" data-unman="${esc(s.id)}" title="Volver a la ubicación automática">Quitar</button>`:"";
   const sugHtml=s=>{const g=sugerencia(s,m);if(!g)return "";const cap=capTol(g.tr.t);
-    return `<div class="sug">Sugerido: <b>${esc(g.tr.t.nombre)}</b> · +${nf1.format(g.c.d)} km · queda en ${nf0.format(g.kg)} / ${nf0.format(g.tr.t.capKg||0)} kg${g.entra?"":` · <span class="pasa">se pasa ${nf0.format(g.kg-cap)} kg de la tolerancia</span>`} <button class="btn sm${g.entra?" pri":""}" data-sug="${esc(s.id)}" data-to="${esc(g.tr.t.id)}" data-pos="${g.c.pos}">Mover</button></div>`};
-  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
+    return `<div class="sug">Sugerido: <b>${esc(g.tr.t.nombre)}</b> · +${nf0.format(g.c.min)} min · +${nf1.format(g.c.km)} km${g.c.pen?` · <span class="pasa">fuera de su zona</span>`:""} · queda en ${nf0.format(g.kg)} / ${nf0.format(g.tr.t.capKg||0)} kg${g.entra?"":` · <span class="pasa">se pasa ${nf0.format(g.kg-cap)} kg de la tolerancia</span>`} <button class="btn sm${g.entra?" pri":""}" data-sug="${esc(s.id)}" data-to="${esc(g.tr.t.id)}" data-pos="${g.c.pos}">Mover</button></div>`};
+  const zonaChip=(s,tid)=>{const t=tid&&camById(tid);if(!t||!pen(t.dep,s))return "";const d=(S.log.depositos||[]).find(x=>x.id===zonaDe(s));return ` <span class="chip st warn" title="Su zona sale de ${esc(d?d.nombre:"otro depósito")}">fuera de zona</span>`};
+  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
     <div class="rsa">${tid?`<button class="btn sm" data-up="${esc(s.id)}" aria-label="Subir">↑</button><button class="btn sm" data-dn="${esc(s.id)}" aria-label="Bajar">↓</button>`:""}<button class="btn sm" data-pick="${esc(s.id)}" title="Corregir el punto haciendo clic en el mapa">📍</button><select class="inp" data-mv="${esc(s.id)}" aria-label="Mover a">${opts(tid||"none")}</select></div></li>`;
   const colBtn=(id,n)=>n?`<button class="btn sm" data-col="${esc(id)}" aria-expanded="${!S.col.has(id)}">${S.col.has(id)?"Ver paradas":"Ocultar paradas"}</button>`:"";
   const resumen=m.trucks.length?rutaResumen(m):"";
@@ -1978,15 +2002,68 @@ $("#v-ruteo").addEventListener("change",e=>{const s=e.target.closest("[data-mv]"
   const f=e.target.closest("[data-fl]");if(f){f.blur();editFlete(f.dataset.fl,f.dataset.campo,f.value)}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.pick){S.pick=null;renderRuteo(true)}});
 /* configuración de depósitos y camiones */
-let logDraft=null;
+let logDraft=null,logDirty=false;   // logDirty: hay cambios sin guardar; la sincronización no los pisa
 function renderLogCfg(useDraft){
-  const el=$("#rtCfg");if(!el)return;if(!useDraft){if(el.contains(document.activeElement))return;logDraft=JSON.parse(JSON.stringify(S.log))}
+  const el=$("#rtCfg");if(!el)return;if(!useDraft){if(el.contains(document.activeElement)||(logDirty&&logDraft))return;logDraft=JSON.parse(JSON.stringify(S.log))}
   el.innerHTML=`<div class="clrow"><label class="tgl">Interior a más de <input class="inp num" id="lgInt" value="${logDraft.interiorKm||150}" inputmode="numeric"> km</label><label class="tgl">Factor de distancia por calles <input class="inp num" id="lgFac" value="${logDraft.factorKm||1.3}" inputmode="decimal"></label></div>
    ${(logDraft.depositos||[]).map((d,di)=>`<div class="ldep" data-di="${di}"><div class="clrow"><b style="font-size:15px">${esc(d.nombre)}</b><span class="note">${esc(d.dir||"")}</span><label class="tgl">Coordenadas <input class="inp" data-dc value="${d.lat!=null?d.lat+", "+d.lon:""}" style="width:200px"></label></div>
      <table class="cat"><thead><tr><th>Camión</th><th class="n">Capacidad (kg)</th><th class="n">Tolerancia (%)</th><th></th></tr></thead><tbody>${(d.camiones||[]).map((t,ti)=>`<tr data-ti="${ti}"><td><input data-f="nombre" value="${esc(t.nombre)}"></td><td><input data-f="capKg" value="${t.capKg||""}" inputmode="numeric" style="text-align:right"></td><td><input data-f="tol" value="${t.tol||0}" inputmode="decimal" style="text-align:right"></td><td><button class="btn sm dng" data-delcam>Quitar</button></td></tr>`).join("")}</tbody></table>
      <div><button class="btn sm" data-addcam>Agregar camión</button></div></div>`).join("")}
+   ${zonasCfgHtml()}
    <div class="clrow" style="margin-top:12px"><span class="sp" style="flex:1"></span><button class="btn pri" id="lgSave">Guardar depósitos y camiones</button></div>`;
 }
+/* Zonas por depósito: qué depósito atiende cada localidad. Se guardan en logística (zonas, zonaModo, medida). */
+S.zOpen=false;S.zTiempos=null;S.zq="";
+// Decisiones de Gere (11/11): Capital solo desde Hurlingham; Pilar y sus localidades desde Escobar.
+const ZONA_REGLAS=[[/^CAPITAL FEDERAL$/,/hurlingham/i],[/^(PILAR|DEL VISO|TORTUGUITAS|MANUEL ALBERTI|PRESIDENTE DERQUI|PTE DERQUI|VILLA ROSA|FATIMA|MANZANARES|VILLA ASTOLFI|LA LONJA|ZELAYA)$/,/escobar/i]];
+function zonaCiudades(){
+  const deps=(S.log.depositos||[]).filter(d=>d.lat!=null);const lim=S.log.interiorKm||150;const m=new Map();
+  for(const c of S.clientes||[]){const k=normCiu(c.ciu);if(!k)continue;const g=geoOf(c);if(!g||g.lat==null||!isFinite(g.lat))continue;
+    if(deps.length&&Math.min(...deps.map(d=>hav(g,d)))>lim)continue;
+    const x=m.get(k)||{k,n:0,lat:0,lon:0};x.n++;x.lat+=+g.lat;x.lon+=+g.lon;m.set(k,x)}
+  for(const k of Object.keys((logDraft&&logDraft.zonas)||{}))if(!m.has(k))m.set(k,{k,n:0,lat:0,lon:0});
+  return [...m.values()].map(x=>({...x,lat:x.n?x.lat/x.n:null,lon:x.n?x.lon/x.n:null})).sort((a,b)=>b.n-a.n||a.k.localeCompare(b.k));
+}
+function zonasCfgHtml(){
+  const d=logDraft;const z=d.zonas||{};const deps=d.depositos||[];const ciu=zonaCiudades();const asig=ciu.filter(x=>z[x.k]).length;
+  const sel=k=>`<select class="inp" data-zc="${esc(k)}"><option value="">Cualquiera</option>${deps.map(p=>`<option value="${esc(p.id)}"${z[k]===p.id?" selected":""}>${esc(p.nombre)}</option>`).join("")}</select>`;
+  const tm=S.zTiempos||{};
+  return `<div class="ldep"><div class="clrow"><b style="font-size:15px">Cómo se arman las rutas</b></div>
+    <div class="clrow"><label class="tgl">Medir en <select class="inp" id="lgMed"><option value="min"${d.medida!=="km"?" selected":""}>Minutos de manejo</option><option value="km"${d.medida==="km"?" selected":""}>Kilómetros</option></select></label>
+    <label class="tgl">Zonas <select class="inp" id="lgZm"><option value="fija"${(d.zonaModo||"fija")==="fija"?" selected":""}>Fijas: pasa al otro depósito solo si no entra</option><option value="preferida"${d.zonaModo==="preferida"?" selected":""}>Preferidas: pasa si ahorra más de 30 min</option><option value="no"${d.zonaModo==="no"?" selected":""}>No usar zonas</option></select></label></div>
+    <div class="note">Los minutos son sin tránsito. Las zonas ponen la experiencia de los choferes: qué depósito sale para cada lado.</div></div>
+   <details class="ldep" id="lgZonas"${S.zOpen?" open":""}><summary><b style="font-size:15px">Zonas por depósito</b> <span class="note">· ${ciu.length} localidades · ${asig} con depósito fijo</span></summary>
+    <div class="clrow" style="margin:8px 0"><input type="search" class="inp" id="lgZq" placeholder="Buscar localidad" value="${esc(S.zq)}" style="width:200px"><button class="btn sm" id="lgZprop">Proponer por tiempo de manejo</button><span class="note">Completa las que están en "Cualquiera": el depósito más rápido si gana por 5 min o más, y Capital desde Hurlingham, Pilar desde Escobar.</span></div>
+    <table class="cat zon"><thead><tr><th>Localidad</th><th class="n">Clientes</th>${deps.map(p=>`<th class="n">Min. desde ${esc(p.nombre)}</th>`).join("")}<th>Sale de</th></tr></thead><tbody>
+    ${ciu.map(x=>`<tr data-zk="${esc(x.k)}"${S.zq&&!x.k.includes(normCiu(S.zq))?" hidden":""}><td>${esc(x.k)}</td><td class="n">${x.n||"—"}</td>${deps.map(p=>{const v=tm[x.k]&&tm[x.k][p.id];return `<td class="n">${v!=null?nf0.format(v):"—"}</td>`}).join("")}<td>${sel(x.k)}</td></tr>`).join("")}</tbody></table></details>`;
+}
+async function proponerZonas(){
+  const deps=(logDraft.depositos||[]).filter(d=>d.lat!=null);if(!deps.length){toast("Faltan las coordenadas de los depósitos");return}
+  const ciu=zonaCiudades().filter(x=>x.lat!=null);const btn=$("#lgZprop");if(btn){btn.disabled=true;btn.textContent="Calculando…"}
+  const ll=p=>`${(+p.lon).toFixed(5)},${(+p.lat).toFixed(5)}`;const tm={};const B=100-deps.length;
+  try{for(let i=0;i<ciu.length;i+=B){const part=ciu.slice(i,i+B);
+      const coords=[...deps,...part].map(ll).join(";");const src=deps.map((_,k)=>k).join(";"),dst=part.map((_,k)=>deps.length+k).join(";");
+      const r=await fetch(`https://router.project-osrm.org/table/v1/driving/${coords}?annotations=duration&sources=${src}&destinations=${dst}`);const j=await r.json();
+      if(j.code!=="Ok")throw new Error(j.message||j.code);
+      part.forEach((x,k)=>{tm[x.k]={};deps.forEach((p,d)=>{const v=j.durations[d][k];if(v!=null)tm[x.k][p.id]=v/60})});
+      if(i+B<ciu.length)await new Promise(r=>setTimeout(r,1100))}
+  }catch(e){toast("No respondió el servicio de mapas (OSRM). Probá de nuevo en un rato.");if(btn){btn.disabled=false;btn.textContent="Proponer por tiempo de manejo"}return}
+  S.zTiempos=tm;logDirty=true;const z=logDraft.zonas=logDraft.zonas||{};let n=0;
+  for(const x of ciu){if(z[x.k])continue;let dep="";
+    const regla=ZONA_REGLAS.find(([re])=>re.test(x.k));
+    if(regla){const d=deps.find(p=>regla[1].test(p.nombre));if(d)dep=d.id}
+    if(!dep&&tm[x.k]){const v=deps.map(p=>[tm[x.k][p.id],p.id]).filter(a=>a[0]!=null).sort((a,b)=>a[0]-b[0]);if(v.length>1&&v[1][0]-v[0][0]>=5)dep=v[0][1]}
+    if(dep){z[x.k]=dep;n++}}
+  S.zOpen=true;renderLogCfg(true);toast(`Propuesta lista: ${n} localidades con depósito. Revisala y tocá Guardar depósitos y camiones.`);
+}
+$("#rtCfg").addEventListener("toggle",e=>{if(e.target.id==="lgZonas")S.zOpen=e.target.open},true);
+["input","change","click"].forEach(ev=>$("#rtCfg").addEventListener(ev,e=>{const t=e.target;
+  if(ev==="click"?t.closest("[data-addcam],[data-delcam]"):(t.id!=="lgZq"&&t.closest("input,select")))logDirty=true},true));
+$("#rtCfg").addEventListener("change",e=>{const t=e.target;
+  if(t.dataset.zc!=null){logDraft.zonas=logDraft.zonas||{};if(t.value)logDraft.zonas[t.dataset.zc]=t.value;else delete logDraft.zonas[t.dataset.zc];return}
+  if(t.id==="lgMed")logDraft.medida=t.value;if(t.id==="lgZm")logDraft.zonaModo=t.value});
+$("#rtCfg").addEventListener("input",e=>{const t=e.target;if(t.id!=="lgZq")return;S.zq=t.value;const q=normCiu(t.value);
+  document.querySelectorAll("#lgZonas tr[data-zk]").forEach(tr=>{tr.hidden=!!q&&!tr.dataset.zk.includes(q)})});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;const dv=t.closest("[data-di]");
   if(t.id==="lgInt")logDraft.interiorKm=parseNum(t.value);if(t.id==="lgFac")logDraft.factorKm=parseNum(t.value);if(!dv)return;const d=logDraft.depositos[+dv.dataset.di];
   if(t.hasAttribute("data-dc")){const v=parseCoords(t.value);if(v){d.lat=v.lat;d.lon=v.lon}}
@@ -1994,10 +2071,11 @@ $("#rtCfg").addEventListener("input",e=>{const t=e.target;const dv=t.closest("[d
 $("#rtCfg").addEventListener("click",e=>{const dv=e.target.closest("[data-di]");
   if(e.target.closest("[data-addcam]")){const d=logDraft.depositos[+dv.dataset.di];d.camiones=d.camiones||[];d.camiones.push({id:d.id+"-"+Date.now().toString(36),nombre:`Camión ${d.camiones.length+1} ${d.nombre}`,capKg:0,tol:5});renderLogCfg(true);return}
   if(e.target.closest("[data-delcam]")){const d=logDraft.depositos[+dv.dataset.di];d.camiones.splice(+e.target.closest("[data-ti]").dataset.ti,1);renderLogCfg(true);return}
+  if(e.target.id==="lgZprop"){proponerZonas();return}
   if(e.target.id==="lgSave")saveLog()});
 async function saveLog(){const d=logDraft;if((d.depositos||[]).some(x=>(x.camiones||[]).some(t=>!String(t.nombre||"").trim()||!(t.capKg>0)))){toast("Cada camión necesita nombre y capacidad en kg");return}
   if(!S.db){toast("Falta conectar la planilla");return}
-  try{const j=await call("guardarLogistica",{logistica:d});S.log=j.logistica||d;document.activeElement&&document.activeElement.blur();toast("Depósitos y camiones guardados");renderRuteo(true);sync(true)}catch(e){toast("No se pudo guardar: "+e.message)}}
+  try{const j=await call("guardarLogistica",{logistica:d});S.log=j.logistica||d;logDirty=false;document.activeElement&&document.activeElement.blur();toast("Depósitos y camiones guardados");renderRuteo(true);sync(true)}catch(e){toast("No se pudo guardar: "+e.message)}}
 
 $("#clRuteo").addEventListener("click",()=>{const ids=(S.clRows||[]).filter(r=>r.ped).map(r=>r.c.id);if(!ids.length){toast("Ningún cliente de la lista tiene pedido para la fecha");return}
   const f=[];if(CF.vend.length)f.push("vendedor: "+CF.vend.join(", "));if(CF.resp.length)f.push("responsable: "+CF.resp.join(", "));if(CF.grupo.length)f.push("grupo: "+CF.grupo.join(", "));if(CF.q)f.push("búsqueda: "+CF.q);
