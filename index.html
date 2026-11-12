@@ -344,8 +344,13 @@ a.btn{text-decoration:none;display:inline-block}
 
       <div class="panel">
         <div class="ph"><h2>Pedidos del día</h2><span class="chip" id="cntChip">0</span><span class="sp"></span>
-          <button class="btn sm" id="copyAll">Copiar resumen</button></div>
-        <div class="pb lt">
+          <button class="btn sm pri" id="pfRuteo" title="Armar el ruteo solo con los pedidos que se ven en la lista">Ruteo</button>
+          <button class="btn sm" id="copyAll" title="Resumen detallado de los pedidos que se ven en la lista">Copiar resumen</button></div>
+        <div class="pb lt" id="pfBar">
+          <div class="ms" data-f="vend"></div><div class="ms" data-f="resp"></div><div class="ms" data-f="grupo"></div>
+          <button type="button" class="btn sm" id="pfClear" hidden>Quitar filtros</button>
+        </div>
+        <div class="pb lt" style="padding-top:0">
           <input type="search" id="listQ" placeholder="Filtrar por cliente, ciudad o producto" aria-label="Filtrar pedidos">
           <label class="tgl" id="soloMiosL" title="Pedidos que tomaste o modificaste"><input type="checkbox" id="soloMios"> Mis pedidos</label>
           <label class="tgl"><input type="checkbox" id="showAnul"> Ver anulados</label>
@@ -1015,10 +1020,23 @@ function provFormHtml(){const f=S.provForm||{};
 /* ---------- list ---------- */
 function resolveNames(){}
 function itemsHtml(s){return `<div class="its">${s.lines.map(l=>`<span class="it" title="${esc(l.p.nombre)} · ID ${esc(PA(l.p))}"><b>${esc(CO(l.p))}</b> ${esc(nf1.format(l.q))}${l.p.unidad==="kg"?" kg":""}</span>`).join("")}</div>`}
+/* Filtros de la lista del día: vendedor, responsable y grupo del cliente (Gere, 12/11: el destino lo marca quién lo da de alta o el responsable).
+   Lo que queda a la vista es lo que usan "Ruteo" y "Copiar resumen". */
+const PFK=["vend","resp","grupo"];
+const PF={vend:[],resp:[],grupo:[]};
+try{const v=JSON.parse(localStorage.getItem("pa_pf")||"{}");for(const k of PFK)if(Array.isArray(v[k]))PF[k]=v[k]}catch(e){}
+const savePF=()=>{try{localStorage.setItem("pa_pf",JSON.stringify(PF))}catch(e){}};
+function pfRow(o){const c=S.cliById.get(String(o.cli))||{};return {o,c:{vend:c.vend||"",resp:c.resp||"",grupo:c.grupo||""}}}
+const passPF=r=>PFK.every(f=>!PF[f].length||PF[f].includes(r.c[f]||VACIO));
+const pfActivo=()=>PFK.some(f=>PF[f].length);
+function pfDesc(){const f=[];for(const k of PFK)if(PF[k].length)f.push(MSL[k].toLowerCase()+": "+PF[k].join(", "));
+  if(S.listQ.trim())f.push("búsqueda: "+S.listQ.trim());if(S.soloMios&&S.uid)f.push("pedidos de "+nameOf(S.uid));return f.join(" · ")}
 function renderList(){
   let os=liveOrders().filter(o=>orderStats(o).lines.length||o.anulado);
   const total=os.filter(o=>!o.anulado).length;$("#cntChip").textContent=total;
   if(!S.showAnul)os=os.filter(o=>!o.anulado);
+  const pfBase=os.filter(o=>!o.anulado).map(pfRow);renderMS(pfBase,"#pfBar",PF);$("#pfClear").hidden=!pfActivo();
+  if(pfActivo()){const ok=new Set(pfBase.filter(passPF).map(r=>r.o.k));os=os.filter(o=>ok.has(o.k)||(o.anulado&&passPF(pfRow(o))))}
   const yo=S.uid?norm(nameOf(S.uid)).trim():"";$("#soloMiosL").hidden=!yo;
   const mios=yo&&S.soloMios;
   if(mios){os=os.filter(o=>rolMio(o,yo));renderMios(yo)}else $("#miosRes").hidden=true;
@@ -1026,6 +1044,9 @@ function renderList(){
   const numOf=new Map();liveOrders().filter(o=>!o.anulado).sort((a,b)=>(a.creado||0)-(b.creado||0)).forEach((o,i)=>numOf.set(o.k,i+1));
   const q=norm(S.listQ).trim();
   if(q)os=os.filter(o=>{const s=orderStats(o);return norm(nomL(o)+" "+o.cli+" "+(o.ciu||"")+" "+s.lines.map(l=>CO(l.p)+" "+PA(l.p)+" "+l.p.nombre).join(" ")).includes(q)});
+  S.pfOrders=os.filter(o=>!o.anulado&&orderStats(o).lines.length);
+  const filtrado=S.pfOrders.length!==total;
+  $("#copyAll").textContent=filtrado?`Copiar resumen (${S.pfOrders.length})`:"Copiar resumen";$("#pfRuteo").textContent=filtrado?`Ruteo (${S.pfOrders.length})`:"Ruteo";
   if(!liveOrders().length){$("#list").innerHTML=`<tbody><tr><td><div class="empty"><b>Sin pedidos para el ${esc(dLong(S.fecha))}</b>Los pedidos que cargues aparecen acá al instante, para todos los que tengan la hoja abierta.</div></td></tr></tbody>`;return}
   let tc=0,ti=0;const ids=[];
   const rows=os.map(o=>{const s=orderStats(o);if(!o.anulado){tc+=s.cajas;ti+=s.imp}ids.push(o.por,o.editPor);const nT={n:nameOf(o.por)};const lg=o.log||[];const lastE=lg.length>1?lg[lg.length-1]:(o.editPor&&o.editPor!==o.por?{u:o.editPor,t:o.editado}:null);const nE=lastE?{n:nameOf(lastE.u)}:null;
@@ -1053,6 +1074,19 @@ function openFromList(k){
   if(window.innerWidth<1100)$("#editor").scrollIntoView({behavior:"smooth",block:"start"});
 }
 $("#listQ").addEventListener("input",e=>{S.listQ=e.target.value;renderList()});
+$("#pfBar").addEventListener("click",e=>{
+  if(e.target.id==="pfClear"){for(const f in PF)PF[f]=[];savePF();renderList();return}
+  const ms=e.target.closest(".ms");if(!ms)return;
+  if(e.target.closest(".ms>button")){const p=ms.querySelector(".msp");const was=!p.hidden;document.querySelectorAll("#pfBar .msp").forEach(x=>x.hidden=true);p.hidden=was;return}
+  if(e.target.closest("[data-all],[data-none]")){PF[ms.dataset.f]=[];savePF();renderList()}});
+$("#pfBar").addEventListener("change",e=>{const ms=e.target.closest(".ms");if(!ms||e.target.type!=="checkbox")return;
+  PF[ms.dataset.f]=[...ms.querySelectorAll(".msp input:checked")].map(i=>i.value);savePF();renderList()});
+document.addEventListener("click",e=>{if(!e.target.closest("#pfBar .ms"))document.querySelectorAll("#pfBar .msp").forEach(x=>x.hidden=true)});
+// Ruteo con lo que se ve en la lista: se pasan las claves de los pedidos (una por lugar de entrega).
+$("#pfRuteo").addEventListener("click",()=>{const os=S.pfOrders||[];if(!os.length){toast("No hay pedidos en la lista para rutear");return}
+  const total=validOrders().length;
+  if(os.length===total)S.rutaSel=null,S.rutaSelInfo="";else{S.rutaSel=os.map(o=>o.k);S.rutaSelInfo=pfDesc()||"filtro de Pedidos"}
+  S.fit=true;if(S.ruta)saveRuta(S.ruta);showView("ruteo")});
 $("#showAnul").addEventListener("change",e=>{S.showAnul=e.target.checked;renderList()});
 /* Mis pedidos: los que tomé (por) o modifiqué (editPor o alguna entrada del historial) */
 function rolMio(o,yo){const es=u=>u&&norm(nameOf(u)).trim()===yo;
@@ -1083,13 +1117,29 @@ function dayText(){
   os.sort((a,b)=>(a.creado||0)-(b.creado||0)).forEach((o,n)=>{const s=orderStats(o);L.push(`${n+1}. ${nomL(o)} — ${s.lines.map(l=>CO(l.p)+" "+nf1.format(l.q)+(l.p.unidad==="kg"?"kg":"")).join(", ")}`)});
   return L.join("\n");
 }
-$("#copyAll").addEventListener("click",()=>copyText(dayText(),"Resumen del día copiado"));
+/* Resumen detallado de los pedidos que se ven en la lista (con filtros). Texto plano, sirve para mail, WhatsApp o Excel. */
+function resumenDetallado(os){
+  os=os.slice().sort((a,b)=>(a.creado||0)-(b.creado||0));
+  const f=pfDesc();const L=[`PEDIDOS AVIGURI · Entrega ${dLong(S.fecha)}`];if(f)L.push("Filtro: "+f);
+  let c=0,i=0,pal=0,kg=0;for(const o of os){const s=orderStats(o);c+=s.cajas;i+=s.imp;pal+=s.pallets||0;kg+=orderKg(o)}
+  L.push(`${os.length} pedido${os.length===1?"":"s"} · ${nf1.format(c)} CAJ · ${nf0.format(kg)} kg · ${pal} pallets · ${money(i)}`,"","TOTALES POR PRODUCTO");
+  for(const t of prodTotals(os))L.push(`• ${CO(t.p)} (${t.p.nombre}): ${nf1.format(t.q)} ${t.p.unidad==="kg"?"kg ("+nf1.format(t.c)+" CAJ)":"CAJ"} · ${money(t.imp)}`);
+  L.push("","DETALLE POR CLIENTE");
+  os.forEach((o,n)=>{const s=orderStats(o);const cc=S.cliById.get(String(o.cli))||{};
+    L.push("",`${n+1}. ${nomL(o)} (#${o.cli})${o.estado==="confirmado"?" · Confirmado":" · Pendiente"}`);
+    const ad=[o.dir,o.ciu].filter(Boolean).join(", ");const dato=[ad,cc.tel?"Tel. "+cc.tel:"",cc.vend?"Vend. "+cc.vend:""].filter(Boolean).join(" · ");if(dato)L.push("   "+dato);
+    for(const l of s.lines)L.push(`   - ${CO(l.p)} ${l.p.nombre}: ${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"} × ${money(l.pr)} = ${money(l.q*l.pr)}`);
+    L.push(`   Total: ${nf1.format(s.cajas)} CAJ · ${nf0.format(orderKg(o))} kg · ${money(s.imp)}`);if(o.obs)L.push("   Obs: "+o.obs)});
+  return L.join("\n");
+}
+$("#copyAll").addEventListener("click",()=>{const os=S.pfOrders||validOrders();if(!os.length){toast("No hay pedidos en la lista");return}
+  copyText(resumenDetallado(os),`Resumen de ${os.length} pedido${os.length===1?"":"s"} copiado`)});
 $("#copyAll2").addEventListener("click",()=>copyText(dayText(),"Resumen del día copiado"));
 
 /* ---------- consolidado ---------- */
-function prodTotals(){
+function prodTotals(os){
   const m=new Map();
-  for(const o of validOrders()){const s=orderStats(o);for(const l of s.lines){const t=m.get(l.p.id)||{p:l.p,q:0,c:0,imp:0,n:0};t.q+=l.q;t.c+=cajasEq(l.p,l.q);t.imp+=l.q*l.pr;t.n++;m.set(l.p.id,t)}}
+  for(const o of os||validOrders()){const s=orderStats(o);for(const l of s.lines){const t=m.get(l.p.id)||{p:l.p,q:0,c:0,imp:0,n:0};t.q+=l.q;t.c+=cajasEq(l.p,l.q);t.imp+=l.q*l.pr;t.n++;m.set(l.p.id,t)}}
   return [...m.values()].sort((a,b)=>(a.p.orden||0)-(b.p.orden||0));
 }
 function renderConsol(){
@@ -1422,12 +1472,12 @@ function clientRows(){
   return out;
 }
 function passAttr(r){for(const f of ["vend","resp","grupo"]){const sel=CF[f];if(sel&&sel.length&&!sel.includes(r.c[f]||VACIO))return false}return true}
-function renderMS(base){
-  document.querySelectorAll("#v-clientes .ms").forEach(el=>{
+function renderMS(base,root,st){root=root||"#v-clientes";st=st||CF;
+  document.querySelectorAll(root+" .ms").forEach(el=>{
     const f=el.dataset.f;const cnt={};for(const r of base)cnt[r.c[f]||VACIO]=(cnt[r.c[f]||VACIO]||0)+1;
-    for(const v of CF[f])if(!(v in cnt))cnt[v]=0;
+    for(const v of st[f])if(!(v in cnt))cnt[v]=0;
     const opts=Object.entries(cnt).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
-    const sel=CF[f];const open=el.querySelector(".msp")&&!el.querySelector(".msp").hidden;
+    const sel=st[f];const open=el.querySelector(".msp")&&!el.querySelector(".msp").hidden;
     const lbl=sel.length?(sel.length===1?sel[0]:sel.length+" elegidos"):"Todos";
     el.innerHTML=`<button type="button" class="${sel.length?"on":""}" aria-expanded="${open}">${esc(MSL[f])}: ${esc(lbl)} ▾</button><div class="msp"${open?"":" hidden"}><div class="mst"><button type="button" class="btn sm" data-all>Todos</button><button type="button" class="btn sm" data-none>Limpiar</button></div>${opts.map(([v,n])=>`<label><input type="checkbox" value="${esc(v)}"${sel.includes(v)?" checked":""}> ${esc(v)}<span class="c">${n}</span></label>`).join("")}</div>`;
   });
@@ -1605,7 +1655,8 @@ function rutaStops(){
   // Una parada por lugar de entrega (cliente o sucursal). s.c.nom ya trae el nombre de la sucursal para mostrar.
   const ped=S.dia.pedidos||{};
   let ks=Object.keys(ped).filter(k=>{const o=ped[k];return o&&!o.anulado&&orderStats(o).lines.length});
-  if(S.rutaSel)ks=ks.filter(k=>S.rutaSel.includes(String(ped[k].cli)));
+  // Selección: ids de cliente (desde Clientes) o claves de pedido "c…" (desde los filtros de Pedidos).
+  if(S.rutaSel){const sel=new Set(S.rutaSel);ks=ks.filter(k=>sel.has(k)||sel.has(String(ped[k].cli)))}
   return ks.map(k=>{const o=ped[k];const id=k.slice(1);const cc=S.cliById.get(String(o.cli));
     const lg=cc?lugarOf(cc,o.suc):{id,cli:String(o.cli),n:+o.suc||1,nom:o.nom,sucNom:o.sucNom||"",dir:o.dir,ciu:o.ciu,tel:""};
     const c={...lg,nom:lg.nom+(lg.n>1?" · "+lg.sucNom:"")};const g=geoOf(c);const st=orderStats(o);
@@ -1933,7 +1984,7 @@ function renderRuteo(force){
   if(!force&&el.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
   if(!built){el.innerHTML=`<div id="rtHead"></div><div id="rtBoxes"></div><div class="rgrid"><div class="panel rmapw"><div id="pickbar"></div><div id="map"></div><div class="mapbar note" id="mapNote"></div></div><div class="rcards" id="rtCards"></div></div>`;built=true}
   const m=rutaModel();const tot=[...m.ok,...m.interior,...m.sin].reduce((a,s)=>a+s.kg,0);
-  $("#rtSel").innerHTML=S.rutaSel?`Ruteando <b>${m.total}</b> clientes con pedido de la selección de Clientes${S.rutaSelInfo?" ("+esc(S.rutaSelInfo)+")":""} · <button class="btn sm" id="rtAll">Usar todos los pedidos del día</button>`:`Ruteando <b>${m.total}</b> clientes con pedido para el ${esc(dLong(S.fecha))}`;
+  $("#rtSel").innerHTML=S.rutaSel?`Ruteando <b>${m.total}</b> pedidos de una selección${S.rutaSelInfo?" ("+esc(S.rutaSelInfo)+")":""} · <button class="btn sm" id="rtAll">Usar todos los pedidos del día</button>`:`Ruteando <b>${m.total}</b> clientes con pedido para el ${esc(dLong(S.fecha))}`;
   const nc=camiones().length;const con=!!S.db;
   const conTrucks=m.trucks.filter(x=>x.st.length);
   $("#rtHead").innerHTML=`<div class="rkpi"><span><b>${nf0.format(tot)}</b> kg en total</span><span><b>${m.ok.length}</b> para rutear</span><span><b>${conTrucks.length}</b> camiones en uso</span><span><b>${m.pend.length}</b> sin camión</span><span class="sp"></span>
