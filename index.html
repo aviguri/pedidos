@@ -290,7 +290,7 @@ a.btn{text-decoration:none;display:inline-block}
         <button class="iconbtn" id="dNext" aria-label="Día siguiente">›</button>
         <div class="dl" id="dLabel"></div>
       </div>
-      <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Sin conectar</span><span id="yoTxt"></span><button class="btn sm" id="reload">Actualizar</button><button class="btn sm" id="openCon" hidden>Conexión</button><button class="btn sm" id="mPass" hidden>Cambiar contraseña</button><button class="btn sm" id="logout" hidden>Salir</button></div>
+      <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Sin conectar</span><span id="yoTxt"></span><button class="btn sm" id="reload">Actualizar</button><a class="btn sm" id="manual" href="manual.html" target="_blank" rel="noopener" title="Manual de uso de la app">Manual</a><button class="btn sm" id="openCon" hidden>Conexión</button><button class="btn sm" id="mPass" hidden>Cambiar contraseña</button><button class="btn sm" id="logout" hidden>Salir</button></div>
     </div>
     <div class="kpis" id="kpis"></div>
     <nav class="tabs" role="tablist">
@@ -470,6 +470,11 @@ a.btn{text-decoration:none;display:inline-block}
       <div class="pb clrow" style="padding-top:0"><input class="inp" id="usrNom" placeholder="Nombre (ej. Camila Pérez)" style="width:200px"><input class="inp" id="usrLog" placeholder="Usuario (ej. camila)" style="width:150px" autocapitalize="none" spellcheck="false"><input class="inp" id="usrPass" placeholder="Contraseña inicial" style="width:150px"><button class="btn sm" id="usrGen" type="button" title="Inventa una contraseña">Generar</button><select class="inp" id="usrRol" style="width:auto"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select><button class="btn sm pri" id="usrAdd">Crear usuario</button><span class="note" id="usrOut"></span></div>
       <div class="pb" id="usrAcceso" hidden style="padding-top:0"></div>
       <div class="tblwrap"><table id="usrTbl"></table></div>
+    </div>
+    <div class="panel" style="margin-top:18px">
+      <div class="ph"><h2>Ventanas horarias a corregir</h2><span class="chip" id="ventCnt">0</span><span class="sp"></span><button class="btn sm" id="ventCopy">Copiar lista</button></div>
+      <div class="pb note" id="ventInfo"></div>
+      <div class="tblwrap" style="max-height:320px"><table id="ventTbl"></table></div>
     </div>
     <div class="panel" style="margin-top:18px">
       <div class="ph"><h2>Clientes provisorios</h2><span class="chip" id="provCnt">0</span><span class="sp"></span><label class="tgl"><input type="checkbox" id="provVinc"> Ver vinculados</label></div>
@@ -983,7 +988,7 @@ function applyMaestro(mx){
   S.info={clientesOrigen:info.clientesOrigen||"",actualizado:info.clientesAct||""};
   S.maestroAct.precios={origen:info.preciosOrigen||"",actualizado:info.preciosAct||""};
   S.maestroAct.saldos={origen:info.saldosOrigen||"",actualizado:info.saldosAct||""};
-  const cl=(mx.clientes||[]).map(r=>({id:String(r[0]),nom:r[1]||"",dir:r[2]||"",ciu:r[3]||"",tel:r[4]||"",vend:r[5]||"",grupo:r[6]||"",resp:r[7]||"",alta:r[8]||""}));
+  const cl=(mx.clientes||[]).map(r=>({id:String(r[0]),nom:r[1]||"",dir:r[2]||"",ciu:r[3]||"",tel:r[4]||"",vend:r[5]||"",grupo:r[6]||"",resp:r[7]||"",alta:r[8]||"",vent:r[9]||""}));
   const a=mx.actividad||{};const act=new Map();for(const c in a.m||{})act.set(c,a.m[c]);
   S.act=act;S.actInfo=a.hasta?{desde:a.desde,hasta:a.hasta,actualizado:a.actualizado}:null;
   S.clientesSis=cl;rebuildClientes();
@@ -1174,7 +1179,17 @@ $("#xlsxBtn").addEventListener("click",async()=>{
 });
 
 /* ---------- datos ---------- */
+// Clientes con algo en VENTANA_HORARIO que no tiene el formato 09:30>>11:00: el ruteo los toma sin ventana.
+function renderVentanas(){
+  const con=S.clientesSis.filter(c=>c.vent),mal=con.filter(c=>!parseVentana(c.vent));S.ventMal=mal;
+  $("#ventCnt").textContent=mal.length;
+  $("#ventInfo").innerHTML=con.length?`<b>${nf0.format(con.length-mal.length)}</b> clientes con ventana horaria válida. Estos <b>${nf0.format(mal.length)}</b> tienen otro contenido en VENTANA_HORARIO (PEDIDOS BD) y el ruteo los toma <b>sin horario</b>. El formato es <b>09:30&gt;&gt;11:00</b>.`
+    :`Todavía no hay ventanas horarias. Se cargan con la columna VENTANA_HORARIO de PEDIDOS BD (formato 09:30&gt;&gt;11:00).${S.ver&&S.ver<7?" Requiere Code.gs versión 7.":""}`;
+  $("#ventTbl").innerHTML=mal.length?`<thead><tr><th>ID</th><th>Cliente</th><th>Ciudad</th><th>VENTANA_HORARIO</th></tr></thead><tbody>${mal.map(c=>`<tr><td>${esc(c.id)}</td><td>${esc(c.nom)}</td><td>${esc(c.ciu)}</td><td>${esc(c.vent)}</td></tr>`).join("")}</tbody>`:"";
+}
+$("#ventCopy").addEventListener("click",()=>{const r=S.ventMal||[];if(!r.length){toast("No hay ventanas para corregir");return}copyText(tsv([["ID","Cliente","Ciudad","VENTANA_HORARIO"],...r.map(c=>[c.id,c.nom,c.ciu,c.vent])]),"Lista copiada: pegala en Excel")});
 function renderDatos(){
+  renderVentanas();
   const i=S.info||{};const pr=S.maestroAct.precios||{};const sa=S.maestroAct.saldos||{};
   const fmtTs=t=>t?new Date(t).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
   $("#baseInfo").innerHTML=`<table><tbody>
@@ -1384,11 +1399,11 @@ function mergeCatalog(productos,arts){
       const m={};for(let r=fh.r+1;r<aoa.length;r++){const row=aoa[r];const cid=String(row&&row[iC]||"").trim();if(!cid)continue;m[cid]=[parseNum(row[iS]),iCr>=0?parseNum(row[iCr]):0,iU>=0?xlDate(row[iU]):"",iUp>=0?xlDate(row[iUp]):"",iCo>=0?String(row[iCo]||""):"",iV>=0?String(row[iV]||""):""]}
       res.saldos={hoja:n,m};continue}
     if((fh=findHeader(aoa,[["IDCLI","IDCLIENTE"],["CLIENTE","RAZONSOCIAL","NOMBRE"],["DIRECCION","DOMICILIO"]]))){
-      const h=fh.h,iC=col(h,["IDCLI","IDCLIENTE"]),iN=col(h,["CLIENTE","RAZONSOCIAL","NOMBRE"]),iD=col(h,["DIRECCION","DOMICILIO"]),iCi=col(h,["CIUDADCP","CIUDAD","LOCALIDAD"]),iT=col(h,["TELEFONO"]),iV=col(h,["VENDEDOR"]),iG=col(h,["GRUPOCLIENTE","GRUPO"]),iRs=col(h,["RESPONSABLE","COBRADOR"]),iAl=col(h,["FECHAALTA","ALTA"]);
+      const h=fh.h,iC=col(h,["IDCLI","IDCLIENTE"]),iN=col(h,["CLIENTE","RAZONSOCIAL","NOMBRE"]),iD=col(h,["DIRECCION","DOMICILIO"]),iCi=col(h,["CIUDADCP","CIUDAD","LOCALIDAD"]),iT=col(h,["TELEFONO"]),iV=col(h,["VENDEDOR"]),iG=col(h,["GRUPOCLIENTE","GRUPO"]),iRs=col(h,["RESPONSABLE","COBRADOR"]),iAl=col(h,["FECHAALTA","ALTA"]),iVh=col(h,["VENTANAHORARIO","VENTANA"]);
       if(res.clientes&&(res.clientes.conCiudad||iCi<0))continue;
       const rows=[];for(let r=fh.r+1;r<aoa.length;r++){const row=aoa[r];const cid=String(row&&row[iC]||"").trim();const nm=String(row&&row[iN]||"").trim();if(!cid||!nm)continue;
-        rows.push([cid,nm,String(row[iD]||"").trim(),iCi>=0?String(row[iCi]||"").trim():"",iT>=0?String(row[iT]||"").trim():"",iV>=0?String(row[iV]||"").trim():"",iG>=0?String(row[iG]||"").trim():"",iRs>=0?String(row[iRs]||"").trim():"",iAl>=0?xlDate(row[iAl]):""])}
-      res.clientes={hoja:n,rows,conCiudad:iCi>=0};continue}
+        rows.push([cid,nm,String(row[iD]||"").trim(),iCi>=0?String(row[iCi]||"").trim():"",iT>=0?String(row[iT]||"").trim():"",iV>=0?String(row[iV]||"").trim():"",iG>=0?String(row[iG]||"").trim():"",iRs>=0?String(row[iRs]||"").trim():"",iAl>=0?xlDate(row[iAl]):"",iVh>=0?String(row[iVh]||"").trim():""])}
+      res.clientes={hoja:n,rows,conCiudad:iCi>=0,conVentana:iVh>=0};continue}
   }
   return res;
 }/*END*/
@@ -1403,7 +1418,10 @@ async function readFile(file){
     if(!res.clientes&&!res.ventas&&!res.saldos){out.innerHTML=`<div class="banner warn">No encontré hojas con los encabezados esperados en ${esc(file.name)}. Revisá que la primera fila (o una de las primeras) tenga ID_CLI, CLIENTE, etc.</div>`;return}
     pending=res;
     const li=[];
-    if(res.clientes){const nuevos=res.clientes.rows.filter(r=>!S.cliById.has(r[0])).length;li.push(`<li><b>Clientes</b> (hoja ${esc(res.clientes.hoja)}): ${nf0.format(res.clientes.rows.length)} filas · ${nf0.format(nuevos)} nuevos</li>`)}
+    if(res.clientes){const nuevos=res.clientes.rows.filter(r=>!S.cliById.has(r[0])).length;li.push(`<li><b>Clientes</b> (hoja ${esc(res.clientes.hoja)}): ${nf0.format(res.clientes.rows.length)} filas · ${nf0.format(nuevos)} nuevos</li>`);
+      if(res.clientes.conVentana){const con=res.clientes.rows.filter(r=>r[9]),ok=con.filter(r=>parseVentana(r[9])).length;
+        li.push(`<li><b>Ventana horaria:</b> ${nf0.format(ok)} clientes con horario${con.length>ok?` · ${nf0.format(con.length-ok)} con otro formato (se ignoran; los ves en Datos › Ventanas a corregir)`:""}</li>`);
+        if(S.ver&&S.ver<7)li.push(`<li style="color:var(--danger)"><b>Para guardar la ventana horaria hay que actualizar Code.gs a la versión 7.</b> El resto se importa igual.</li>`)}}
     if(res.ventas){const mc=mergeCatalog(S.productos,res.ventas.arts);res.cat=mc;
       li.push(`<li><b>Últimos precios</b> (hoja ${esc(res.ventas.hoja)}): ${nf0.format(res.ventas.filas)} ventas → ${nf0.format(Object.keys(res.ventas.m).length)} combinaciones cliente × producto</li>`);
       li.push(`<li><b>Actividad de compras</b>: ${nf0.format(Object.keys(res.ventas.act).length)} clientes con compras entre el ${esc(dShort(res.ventas.desde))} y el ${esc(dShort(res.ventas.hasta))}</li>`);
@@ -1421,7 +1439,8 @@ $("#impOut").addEventListener("click",async e=>{
   if(!S.db){toast("Falta conectar la planilla");return}
   e.target.disabled=true;const p=pending;const pasos=[];
   // La mezcla se hace acá, igual que en el artifact; la planilla recibe cada tabla ya armada.
-  if(p.clientes){const map=new Map(S.clientes.map(c=>[c.id,[c.id,c.nom,c.dir,c.ciu,c.tel,c.vend,c.grupo||"",c.resp||"",c.alta||""]]));
+  // Solo clientes del sistema (los provisorios viven en su propia hoja).
+  if(p.clientes){const map=new Map(S.clientesSis.map(c=>[c.id,[c.id,c.nom,c.dir,c.ciu,c.tel,c.vend,c.grupo||"",c.resp||"",c.alta||"",c.vent||""]]));
     for(const r of p.clientes.rows)map.set(r[0],r);
     const all=[...map.values()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
     pasos.push(["Clientes",{parte:"clientes",filas:all,origen:p.clientes.hoja}])}
@@ -1618,9 +1637,10 @@ const capTol=t=>(t.capKg||0)*(1+(t.tol||0)/100);
    si no, línea recta × factorKm. Los km de las tarjetas usan D(); el armado usa C() (minutos por defecto) + zonas. */
 S.mat=null;
 const pk=p=>(+p.lat).toFixed(5)+","+(+p.lon).toFixed(5);
-function D(a,b){const m=S.mat;if(m){const i=m.idx.get(pk(a)),j=m.idx.get(pk(b));if(i!=null&&j!=null){const v=m.km[i][j];if(v!=null)return v}}return hav(a,b)*(S.log.factorKm||1.3)}
+const pkc=p=>p._pk&&p._pkl===p.lat?p._pk:(p._pkl=p.lat,p._pk=pk(p));   // misma clave, guardada en el objeto (el armado la pide miles de veces)
+function D(a,b){const m=S.mat;if(m){const i=m.idx.get(pkc(a)),j=m.idx.get(pkc(b));if(i!=null&&j!=null){const v=m.km[i][j];if(v!=null)return v}}return hav(a,b)*(S.log.factorKm||1.3)}
 // Minutos de manejo sin tránsito (OSRM). Sin matriz: km estimados a 35 km/h.
-function T(a,b){const m=S.mat;if(m&&m.min){const i=m.idx.get(pk(a)),j=m.idx.get(pk(b));if(i!=null&&j!=null){const v=m.min[i][j];if(v!=null)return v}}return D(a,b)*60/35}
+function T(a,b){const m=S.mat;if(m&&m.min){const i=m.idx.get(pkc(a)),j=m.idx.get(pkc(b));if(i!=null&&j!=null){const v=m.min[i][j];if(v!=null)return v}}return D(a,b)*60/35}
 /* Lo que el armado minimiza: minutos (por defecto) o km, según Depósitos y camiones › Medir en. */
 const C=(a,b)=>S.log.medida==="km"?D(a,b):T(a,b);
 /* Zonas por depósito: localidad → id de depósito. Salir de otro depósito suma una penalidad:
@@ -1630,6 +1650,27 @@ const normCiu=s=>{let x=norm(String(s||"")).toUpperCase().replace(/[.,]/g," ").r
 const zonaDe=s=>{const z=S.log.zonas;return z&&s&&s.c?z[normCiu(s.c.ciu)]||"":""};
 const PEN={fija:600,preferida:30,no:0};
 const pen=(dep,s)=>{const z=zonaDe(s);return z&&dep&&z!==dep.id?PEN[S.log.zonaModo||"fija"]||0:0};
+/* Horarios y ventanas (13/11). Parámetros generales en Depósitos y camiones › Cómo se arman las rutas:
+   salida de los camiones (06:00), minutos por cliente (10) + segundos por bulto/CAJ (20), factor de tránsito (×1,3) y tolerancia de ventana (20 min).
+   Ventana "09:30>>11:00" (VENTANA_HORARIO de PEDIDOS BD): si llega antes espera a que abra; hasta 20 min de espera es tiempo normal, más se evita;
+   hasta las 11:20 está bien, después es tarde y penaliza fuerte. Sin ventana: sin restricción. */
+const hm2min=s=>{const m=String(s||"").match(/^\s*(\d{1,2})[:.](\d{2})\s*$/);return m?+m[1]*60+ +m[2]:null};
+const min2hm=m=>{m=Math.round(m);return pad(Math.floor(m/60)%24)+":"+pad(((m%60)+60)%60)};
+function parseVentana(s){const m=String(s||"").match(/^\s*(\d{1,2}):(\d{2})\s*>>\s*(\d{1,2}):(\d{2})\s*$/);if(!m)return null;const a=+m[1]*60+ +m[2],b=+m[3]*60+ +m[4];return b>a?{a,b}:null}
+const ventTxt=v=>v?min2hm(v.a)+" a "+min2hm(v.b):"";
+function TP(){const L=S.log||{};const sal=hm2min(L.salida);return {sal:sal==null?360:sal,par:L.minParada>=0?+L.minParada:10,blt:L.segBulto>=0?+L.segBulto:20,fac:L.factorTr>0?+L.factorTr:1.3,tol:L.tolVent>=0?+L.tolVent:20}}
+const servMin=(s,p)=>(p||TP()).par+(s.caj||0)*(p||TP()).blt/60;
+// Simula el recorrido de un camión: llegada, espera y atraso por parada, y hora de vuelta al depósito.
+function horario(dep,arr,p){p=p||TP();let t=p.sal,prev=dep;const paradas=[];let tarde=0,nTarde=0,espera=0,extra=0;
+  for(const s of arr){t+=T(prev,s)*p.fac;const lle=t;let w=0;const v=s.vent;
+    if(v&&t<v.a){w=v.a-t;t=v.a}
+    const late=v?Math.max(0,t-(v.b+p.tol)):0;if(late>0)nTarde++;
+    tarde+=late;espera+=w;extra+=Math.max(0,w-p.tol);paradas.push({lle,ini:t,w,late,v});t+=servMin(s,p);prev=s}
+  return {paradas,vuelta:arr.length?t+T(prev,dep)*p.fac:p.sal,tarde,nTarde,espera,extra};
+}
+// Costo de las ventanas para el armado: la espera cuenta como tiempo, la espera de más se evita y llegar tarde pesa mucho.
+function ventCost(dep,arr){if(!arr.some(s=>s.vent))return 0;const h=horario(dep,arr);return h.espera+3*h.extra+20*h.tarde}
+let VW=false;   // true cuando alguna parada del armado tiene ventana: los movimientos se evalúan con el recorrido completo
 // Pide a OSRM los km por calle entre todos los puntos, en bloques de 50 × 50 (máximo 100 coordenadas por consulta, 1 por segundo).
 async function cargarMatriz(pts){
   const keys=[...new Set(pts.map(pk))];
@@ -1649,8 +1690,10 @@ async function cargarMatriz(pts){
   catch(e){return false}
 }
 // Costo de meter la parada s en el mejor lugar de arr (minutos o km según la medida, más la penalidad de zona). km = km que agrega.
-function insCost(dep,arr,s){let best={pos:0,d:1e9};for(let i=0;i<=arr.length;i++){const a=i?arr[i-1]:dep,b=i<arr.length?arr[i]:dep;const d=C(a,s)+C(s,b)-C(a,b);if(d<best.d)best={pos:i,d}}
-  const a=best.pos?arr[best.pos-1]:dep,b=best.pos<arr.length?arr[best.pos]:dep;best.km=D(a,s)+D(s,b)-D(a,b);best.min=T(a,s)+T(s,b)-T(a,b);best.pen=pen(dep,s);best.d+=best.pen;return best}
+function insCost(dep,arr,s){let best={pos:0,d:1e9};
+  if(VW){const base=tourCost(dep,arr);for(let i=0;i<=arr.length;i++){const a2=arr.slice();a2.splice(i,0,s);const d=tourCost(dep,a2)-base;if(d<best.d)best={pos:i,d}}}
+  else for(let i=0;i<=arr.length;i++){const a=i?arr[i-1]:dep,b=i<arr.length?arr[i]:dep;const d=C(a,s)+C(s,b)-C(a,b);if(d<best.d)best={pos:i,d}}
+  const a=best.pos?arr[best.pos-1]:dep,b=best.pos<arr.length?arr[best.pos]:dep;best.km=D(a,s)+D(s,b)-D(a,b);best.min=T(a,s)+T(s,b)-T(a,b);best.pen=pen(dep,s);if(!VW)best.d+=best.pen;return best}
 function rutaStops(){
   // Una parada por lugar de entrega (cliente o sucursal). s.c.nom ya trae el nombre de la sucursal para mostrar.
   const ped=S.dia.pedidos||{};
@@ -1660,7 +1703,9 @@ function rutaStops(){
   return ks.map(k=>{const o=ped[k];const id=k.slice(1);const cc=S.cliById.get(String(o.cli));
     const lg=cc?lugarOf(cc,o.suc):{id,cli:String(o.cli),n:+o.suc||1,nom:o.nom,sucNom:o.sucNom||"",dir:o.dir,ciu:o.ciu,tel:""};
     const c={...lg,nom:lg.nom+(lg.n>1?" · "+lg.sucNom:"")};const g=geoOf(c);const st=orderStats(o);
-    return {id,c,o,g,kg:orderKg(o),caj:st.cajas,imp:st.imp,lat:g.lat,lon:g.lon}});
+    // Ventana horaria: la del cliente (PEDIDOS BD) vale para su dirección principal; las sucursales no tienen.
+    const vent=lg.n>1?null:parseVentana(cc&&cc.vent);
+    return {id,c,o,g,kg:orderKg(o),caj:st.cajas,imp:st.imp,lat:g.lat,lon:g.lon,vent,ventTxt:lg.n>1?"":(cc&&cc.vent)||""}});
 }
 function classify(stops){
   const deps=(S.log.depositos||[]).filter(d=>d.lat!=null);const sin=[],interior=[],ok=[];
@@ -1672,9 +1717,14 @@ function classify(stops){
 function tourLen(dep,arr,f){f=f||D;if(!arr.length)return 0;let d=f(dep,arr[0]);for(let i=1;i<arr.length;i++)d+=f(arr[i-1],arr[i]);return d+f(arr[arr.length-1],dep)}
 const tourMin=(dep,arr)=>tourLen(dep,arr,T);
 // Lo que minimiza el armado para un camión: recorrido en la medida elegida + penalidades de zona.
-const tourCost=(dep,arr)=>tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0);
+const tourCost=(dep,arr)=>tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0)+ventCost(dep,arr);
 // 2-opt: da vuelta tramos mientras acorte. Con km por calle la ida y la vuelta pueden diferir, así que se cuenta el tramo invertido completo.
 function twoOpt(dep,arr){
+  if(VW&&arr.some(s=>s.vent)){   // con ventanas el orden cambia los horarios: se evalúa el recorrido completo
+    let cur=arr.slice(),cc=tourCost(dep,cur),improved=true,guard=0;
+    while(improved&&guard++<30){improved=false;for(let i=0;i<cur.length-1;i++)for(let k=i+1;k<cur.length;k++){
+      const n=cur.slice(0,i).concat(cur.slice(i,k+1).reverse(),cur.slice(k+1));const nc=tourCost(dep,n);if(nc<cc-1e-9){cur=n;cc=nc;improved=true}}}
+    return cur}
   if(arr.length<3)return arr.slice();const pts=[dep,...arr,dep];let improved=true,guard=0;
   while(improved&&guard++<80){improved=false;for(let i=1;i<pts.length-2;i++)for(let k=i+1;k<pts.length-1;k++){
     let dentro=0,rev=0;for(let x=i;x<k;x++){dentro+=C(pts[x],pts[x+1]);rev+=C(pts[x+1],pts[x])}
@@ -1695,7 +1745,8 @@ function optimizeOrder(dep,arr){
    y, si quedó gente afuera, cambiarla por clientes que pesen igual o menos y agreguen más km. */
 /* Desde el 11/11 el costo es C() (minutos de manejo por defecto) + penalidad por salir de un depósito que no es el de la zona.
    En el código el total sigue llamándose "km" por costumbre, pero es ese costo. */
-const removeGain=(dep,arr,i)=>{const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return C(a,arr[i])+C(arr[i],b)-C(a,b)+pen(dep,arr[i])};
+const sinI=(arr,i,L)=>{const a=arr.slice();a.splice(i,L||1);return a};
+const removeGain=(dep,arr,i)=>{if(VW)return tourCost(dep,arr)-tourCost(dep,sinI(arr,i));const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return C(a,arr[i])+C(arr[i],b)-C(a,b)+pen(dep,arr[i])};
 const solKm=R=>R.reduce((a,r)=>a+tourCost(r.dep,r.st),0);
 const solKmReal=R=>R.reduce((a,r)=>a+tourLen(r.dep,r.st),0);
 const solKg=R=>R.reduce((a,r)=>a+r.kg,0);
@@ -1726,10 +1777,11 @@ function busquedaLocal(sol){
     // Mover un tramo de 2 o 3 paradas seguidas a otro camión (también dado vuelta).
     for(const L of [2,3])for(const A of R)for(let i=0;i+L<=A.st.length;i++){
       const seg=A.st.slice(i,i+L),kgS=seg.reduce((a,s)=>a+s.kg,0);const p=i?A.st[i-1]:A.dep,n=i+L<A.st.length?A.st[i+L]:A.dep;
-      const gan=C(p,seg[0])+inner(seg)+C(seg[L-1],n)-C(p,n)+penS(A.dep,seg);let best=null;
-      for(const B of R){if(B===A||B.kg+kgS>B.cap)continue;const pB=penS(B.dep,seg);
+      const gan=VW?tourCost(A.dep,A.st)-tourCost(A.dep,sinI(A.st,i,L)):C(p,seg[0])+inner(seg)+C(seg[L-1],n)-C(p,n)+penS(A.dep,seg);let best=null;
+      for(const B of R){if(B===A||B.kg+kgS>B.cap)continue;const pB=penS(B.dep,seg);const baseB=VW?tourCost(B.dep,B.st):0;
         for(const sg of [seg,seg.slice().reverse()]){const inn=inner(sg);
-          for(let j=0;j<=B.st.length;j++){const a=j?B.st[j-1]:B.dep,b=j<B.st.length?B.st[j]:B.dep;const c=C(a,sg[0])+inn+C(sg[L-1],b)-C(a,b)+pB;
+          for(let j=0;j<=B.st.length;j++){const a=j?B.st[j-1]:B.dep,b=j<B.st.length?B.st[j]:B.dep;
+            const c=VW?(()=>{const b2=B.st.slice();b2.splice(j,0,...sg);return tourCost(B.dep,b2)-baseB})():C(a,sg[0])+inn+C(sg[L-1],b)-C(a,b)+pB;
             if(c<gan-0.05&&(!best||c<best.c))best={B,j,sg,c}}}}
       if(best){A.st.splice(i,L);A.kg-=kgS;best.B.st.splice(best.j,0,...best.sg);best.B.kg+=kgS;cambio=true;i--}}
     // Intercambiar dos clientes entre camiones.
@@ -1737,15 +1789,17 @@ function busquedaLocal(sol){
       for(let i=0;i<A.st.length;i++)for(let j=0;j<B.st.length;j++){const s=A.st[i],u=B.st[j];
         if(A.kg-s.kg+u.kg>A.cap||B.kg-u.kg+s.kg>B.cap)continue;
         const pa=i?A.st[i-1]:A.dep,na=i<A.st.length-1?A.st[i+1]:A.dep,pb=j?B.st[j-1]:B.dep,nb=j<B.st.length-1?B.st[j+1]:B.dep;
-        const d=C(pa,u)+C(u,na)-C(pa,s)-C(s,na)+C(pb,s)+C(s,nb)-C(pb,u)-C(u,nb)+pen(A.dep,u)-pen(A.dep,s)+pen(B.dep,s)-pen(B.dep,u);
+        const d=VW?(()=>{const a2=A.st.slice(),b2=B.st.slice();a2[i]=u;b2[j]=s;return tourCost(A.dep,a2)+tourCost(B.dep,b2)-tourCost(A.dep,A.st)-tourCost(B.dep,B.st)})()
+          :C(pa,u)+C(u,na)-C(pa,s)-C(s,na)+C(pb,s)+C(s,nb)-C(pb,u)-C(u,nb)+pen(A.dep,u)-pen(A.dep,s)+pen(B.dep,s)-pen(B.dep,u);
         if(d<-0.05){A.st[i]=u;B.st[j]=s;A.kg+=u.kg-s.kg;B.kg+=s.kg-u.kg;cambio=true}}}
-    for(const r of R){const o=twoOpt(r.dep,r.st);if(tourLen(r.dep,o,C)<tourLen(r.dep,r.st,C)-0.05){r.st=o;cambio=true}}
+    for(const r of R){const o=twoOpt(r.dep,r.st);if(tourCost(r.dep,o)<tourCost(r.dep,r.st)-0.05){r.st=o;cambio=true}}
     // Los de afuera entran si hay lugar; si no, se cambian por clientes más livianos o iguales que agreguen más km.
     for(let k=fuera.length-1;k>=0;k--){const b=mejorIns(R,fuera[k]);if(b){poner(b,fuera[k]);fuera.splice(k,1);cambio=true}}
     for(let k=0;k<fuera.length;k++){const u=fuera[k];let hecho=false;
       for(const A of R){for(let i=0;i<A.st.length;i++){const s=A.st[i];if(u.kg<s.kg||A.kg-s.kg+u.kg>A.cap)continue;
         const p=i?A.st[i-1]:A.dep,n=i<A.st.length-1?A.st[i+1]:A.dep;
-        if(C(p,u)+C(u,n)+pen(A.dep,u)<C(p,s)+C(s,n)+pen(A.dep,s)-0.5){A.st[i]=u;A.kg+=u.kg-s.kg;fuera[k]=s;cambio=hecho=true;break}}if(hecho)break}}
+        const mejora=VW?(()=>{const a2=A.st.slice();a2[i]=u;return tourCost(A.dep,a2)<tourCost(A.dep,A.st)-0.5})():C(p,u)+C(u,n)+pen(A.dep,u)<C(p,s)+C(s,n)+pen(A.dep,s)-0.5;
+        if(mejora){A.st[i]=u;A.kg+=u.kg-s.kg;fuera[k]=s;cambio=hecho=true;break}}if(hecho)break}}
   }
   sol.kg=solKg(R);sol.km=solKm(R);return sol;
 }
@@ -1776,11 +1830,12 @@ async function sugerirRutas(){
     setSync(true,"Pidiendo distancias por calle…");
     const porCalle=await cargarMatriz([...new Map(trucks.map(t=>[t.dep.id,t.dep])).values(),...ok]);
     setSync(true,"Armando rutas…");await new Promise(r=>setTimeout(r,30));
+    VW=ok.some(s=>s.vent);
     let x=12345;const rnd=()=>(x=(x*16807)%2147483647)/2147483647;
     let best=null;
     for(const modo of ["lejos","barato","azar","azar","azar","azar","azar"]){const sol=busquedaLocal(construir(ok,trucks,modo,rnd));if(!best||mejorQue(sol,best))best=sol}
     best=busquedaLocal(romperRearmar(best,ok,2500,rnd));
-    for(const r of best.R){const alt=optimizeOrder(r.dep,r.st);if(tourLen(r.dep,alt,C)<tourLen(r.dep,r.st,C))r.st=alt}
+    for(const r of best.R){const alt=optimizeOrder(r.dep,r.st);if(tourCost(r.dep,alt)<tourCost(r.dep,r.st))r.st=alt}
     best.km=solKmReal(best.R);const minT=best.R.reduce((a,r)=>a+tourMin(r.dep,r.st),0);
     const fueraZona=best.R.reduce((a,r)=>a+r.st.filter(s=>pen(r.dep,s)>0).length,0);
     const asig={},orden={};
@@ -1796,11 +1851,13 @@ async function sugerirRutas(){
 const firma=(t,st)=>t.id+"|"+[t.dep,...st].map(p=>(+p.lat).toFixed(5)+","+(+p.lon).toFixed(5)).join(";");
 function rutaModel(){
   const stops=rutaStops();const cls=classify(stops);const R=S.ruta||{asig:{},orden:{}};const byId=new Map(cls.ok.map(s=>[s.id,s]));
+  VW=cls.ok.some(s=>s.vent);const tp=TP();
   const trucks=camiones().map(t=>{const ids=((R.orden||{})[t.id]||[]).filter(id=>byId.has(id)&&R.asig[id]===t.id);
     for(const id in R.asig)if(R.asig[id]===t.id&&byId.has(id)&&!ids.includes(id))ids.push(id);
     const st=ids.map(id=>byId.get(id));const kg=st.reduce((a,s)=>a+s.kg,0);
     const real=R.real&&R.real[t.id]&&R.real[t.id].firma===firma(t,st)?R.real[t.id]:null;
-    return {t,st,kg,caj:st.reduce((a,s)=>a+s.caj,0),imp:st.reduce((a,s)=>a+s.imp,0),km:tourLen(t.dep,st),real}});
+    const h=horario(t.dep,st,tp);st.forEach((s,k)=>s.hh=h.paradas[k]);
+    return {t,st,kg,caj:st.reduce((a,s)=>a+s.caj,0),imp:st.reduce((a,s)=>a+s.imp,0),km:tourLen(t.dep,st),real,h}});
   const asigned=new Set(trucks.flatMap(x=>x.st.map(s=>s.id)));const pend=cls.ok.filter(s=>!asigned.has(s.id));
   return {...cls,trucks,pend,total:stops.length};
 }
@@ -1842,8 +1899,9 @@ async function kmReales(tids){
 }
 function gmapsLinks(dep,st){const pts=[dep,...st,dep].map(p=>`${(+p.lat).toFixed(6)},${(+p.lon).toFixed(6)}`);const out=[];for(let i=0;i<pts.length-1;i+=9){out.push("https://www.google.com/maps/dir/"+pts.slice(i,i+10).join("/"))}return out}
 const kmTxt=tr=>tr.real?`${nf1.format(tr.real.km)} km por calles · ${durTxt(tr.real.min)} de manejo`:`~${nf0.format(tr.km)} km estimados`;
-function hojaRuta(tr){const L=[`*HOJA DE RUTA* · ${tr.t.nombre} (${tr.t.dep.nombre}) · ${dLong(S.fecha)}`,`${tr.st.length} paradas · ${nf0.format(tr.kg)} kg · ${nf1.format(tr.caj)} CAJ · ${kmTxt(tr)}`,""];
-  tr.st.forEach((s,i)=>{L.push(`${i+1}. *${s.c.nom}* (#${s.id})`);const ad=[s.c.dir,s.c.ciu].filter(Boolean).join(", ");if(ad)L.push("   "+ad);if(s.c.tel)L.push("   Tel. "+s.c.tel);
+const horaParada=s=>s.hh?`Llega ~${min2hm(s.hh.lle)}${s.vent?` · recibe ${ventTxt(s.vent)}`:""}${s.hh.late>0?" · TARDE":""}`:"";
+function hojaRuta(tr){const L=[`*HOJA DE RUTA* · ${tr.t.nombre} (${tr.t.dep.nombre}) · ${dLong(S.fecha)}`,`${tr.st.length} paradas · ${nf0.format(tr.kg)} kg · ${nf1.format(tr.caj)} CAJ · ${kmTxt(tr)}`,`Sale ${min2hm(TP().sal)} · vuelve ~${min2hm(tr.h.vuelta)}`,""];
+  tr.st.forEach((s,i)=>{L.push(`${i+1}. *${s.c.nom}* (#${s.id})`);if(s.hh)L.push("   "+horaParada(s));const ad=[s.c.dir,s.c.ciu].filter(Boolean).join(", ");if(ad)L.push("   "+ad);if(s.c.tel)L.push("   Tel. "+s.c.tel);
     L.push("   "+orderStats(s.o).lines.map(l=>`${CO(l.p)} ${nf1.format(l.q)}${l.p.unidad==="kg"?" kg":""}`).join(" · ")+` · ${money(s.imp)}`);if(s.o.obs)L.push("   Obs: "+s.o.obs)});
   const links=gmapsLinks(tr.t.dep,tr.st);L.push("","Recorrido en Google Maps:");links.forEach((u,i)=>L.push(`Tramo ${i+1}: ${u}`));return L.join("\n")}
 function hojaCarga(tr){const m=new Map();for(const s of tr.st)for(const l of orderStats(s.o).lines){const x=m.get(l.p.id)||{p:l.p,q:0};x.q+=l.q;m.set(l.p.id,x)}
@@ -1879,7 +1937,7 @@ async function pdfCarga(trs,nombre){
     doc.text("GRUPO CTS · AVIGURI",W-12,10,{align:"right"});
     doc.setTextColor(0);doc.setFontSize(10);
     const cap=tr.t.capKg||0;
-    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(tr.imp)}`,12,29);
+    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(tr.imp)} · sale ${min2hm(TP().sal)}, vuelve ~${min2hm(tr.h.vuelta)}`,12,29);
     // Mercadería total
     const m=new Map();for(const s of tr.st)for(const l of orderStats(s.o).lines){const x=m.get(l.p.id)||{p:l.p,q:0,c:0,kg:0};x.q+=l.q;x.c+=cajasEq(l.p,l.q);x.kg+=pesoKg(l.p,l.q);m.set(l.p.id,x)}
     const merc=[...m.values()].sort((a,b)=>(a.p.orden||0)-(b.p.orden||0));
@@ -1893,7 +1951,7 @@ async function pdfCarga(trs,nombre){
     // Entregas en orden
     doc.autoTable({startY:y+3,head:[["#","Cliente y dirección","Mercadería","CAJ","Importe","Recibió (firma y aclaración)"]],
       body:tr.st.map((s,k)=>{const c=s.c;const ad=[c.dir,c.ciu].filter(Boolean).join(", ");
-        const cli=`${c.nom}  (#${s.o.cli})\n${ad}${c.tel?"\nTel. "+c.tel:""}${s.o.obs?"\nObs: "+s.o.obs:""}`;
+        const cli=`${c.nom}  (#${s.o.cli})\n${ad}${c.tel?"\nTel. "+c.tel:""}${s.hh?"\n"+horaParada(s):""}${s.o.obs?"\nObs: "+s.o.obs:""}`;
         return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""}`).join("\n"),fmt1(s.caj),money(s.imp),""]}),
       theme:"grid",styles:{fontSize:8.8,cellPadding:1.8,valign:"top"},headStyles:{fillColor:verde},
       columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:70},2:{cellWidth:42},3:{cellWidth:13,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:31}},
@@ -1966,16 +2024,17 @@ function rutaResumen(m){
       <td class="n"><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)}</span><div class="note">${pct}%</div></td>
       <td class="n">${tr.st.length?moneyShort(tr.imp):"—"}</td>
       <td class="n">${tr.st.length?(tr.real?`<b>${nf1.format(km)}</b><div class="note">por calles</div>`:`~${nf0.format(km)}<div class="note">estimado</div>`):"—"}</td>
-      <td class="n">${tr.real?durTxt(tr.real.min):"—"}</td></tr>`};
+      <td class="n">${tr.real?durTxt(tr.real.min):"—"}</td>
+      <td class="n">${tr.st.length?`~${min2hm(tr.h.vuelta)}${tr.h.nTarde?`<div class="note" style="color:var(--danger)">${tr.h.nTarde} tarde</div>`:""}`:"—"}</td></tr>`};
   const filas=m.trucks.map(fila).join("");
   const pk=m.pend.reduce((a,s)=>a+s.kg,0);
-  const sin=m.pend.length?`<tr data-goto="none" class="sinc"><td><span class="rsw" style="background:#6b7280;display:inline-block;vertical-align:-2px"></span> <b>Sin camión</b></td><td class="n">${m.pend.length}</td><td class="n">${nf1.format(m.pend.reduce((a,s)=>a+s.caj,0))}</td><td class="n">${nf0.format(pk)}</td><td class="n">${moneyShort(m.pend.reduce((a,s)=>a+s.imp,0))}</td><td></td><td></td></tr>`:"";
+  const sin=m.pend.length?`<tr data-goto="none" class="sinc"><td><span class="rsw" style="background:#6b7280;display:inline-block;vertical-align:-2px"></span> <b>Sin camión</b></td><td class="n">${m.pend.length}</td><td class="n">${nf1.format(m.pend.reduce((a,s)=>a+s.caj,0))}</td><td class="n">${nf0.format(pk)}</td><td class="n">${moneyShort(m.pend.reduce((a,s)=>a+s.imp,0))}</td><td></td><td></td><td></td></tr>`:"";
   const algunaAbierta=m.trucks.some(tr=>tr.st.length&&!S.col.has(tr.t.id))||(m.pend.length&&!S.col.has("none"));
   const depsCon=(S.log.depositos||[]).filter(d=>m.trucks.some(tr=>tr.st.length&&tr.t.dep.id===d.id));
   const pdfBtns=depsCon.map(d=>`<button class="btn sm pri" data-pdfdep="${esc(d.id)}" title="Hoja de carga de todos los camiones de ${esc(d.nombre)}">PDF ${esc(d.nombre)}</button>`).join("")+(depsCon.length>1?`<button class="btn sm" data-pdfdep="*">PDF todos</button>`:"");
   return `<div class="panel"><div class="ph"><h2>Resumen de camiones</h2><span class="sp"></span>${pdfBtns}<button class="btn sm" id="rtColAll">${algunaAbierta?"Ocultar todas las paradas":"Ver todas las paradas"}</button></div>
-    <div class="tblwrap"><table class="rsum"><thead><tr><th>Camión</th><th class="n">Clientes</th><th class="n">CAJ</th><th class="n">Kg / capacidad</th><th class="n">Importe</th><th class="n">Km</th><th class="n">Manejo</th></tr></thead>
-    <tbody>${filas}${sin}</tbody><tfoot><tr><td>Total en camiones</td><td class="n">${P}</td><td class="n">${nf1.format(C)}</td><td class="n">${nf0.format(K)} kg</td><td class="n">${moneyShort(I)}</td><td class="n">${est?"~":""}${nf0.format(KM)}</td><td class="n">${MIN&&!est?durTxt(MIN):MIN?"≥ "+durTxt(MIN):"—"}</td></tr></tfoot></table></div>
+    <div class="tblwrap"><table class="rsum"><thead><tr><th>Camión</th><th class="n">Clientes</th><th class="n">CAJ</th><th class="n">Kg / capacidad</th><th class="n">Importe</th><th class="n">Km</th><th class="n">Manejo</th><th class="n">Vuelve</th></tr></thead>
+    <tbody>${filas}${sin}</tbody><tfoot><tr><td>Total en camiones</td><td class="n">${P}</td><td class="n">${nf1.format(C)}</td><td class="n">${nf0.format(K)} kg</td><td class="n">${moneyShort(I)}</td><td class="n">${est?"~":""}${nf0.format(KM)}</td><td class="n">${MIN&&!est?durTxt(MIN):MIN?"≥ "+durTxt(MIN):"—"}</td><td></td></tr></tfoot></table></div>
     ${est&&P?`<div class="note" style="padding:8px 16px">Los km con "~" son estimados en línea recta. Tocá <b>Calcular km por calles</b> para comparar con los reales.</div>`:""}</div>`;
 }
 function renderRuteo(force){
@@ -1993,6 +2052,12 @@ function renderRuteo(force){
   const h=[];const ci=capInfo(m);
   if(nc&&ci.faltan>0)h.push(`<div class="rbox dng"><div class="rbh"><b>Faltan ${nf0.format(ci.faltan)} kg de capacidad</b> · pedido para rutear ${nf0.format(ci.ped)} kg · capacidad con tolerancia ${nf0.format(ci.cap)} kg<span class="sp"></span><button class="btn sm pri" data-addflete>Agregar flete</button></div><div class="note" style="margin-top:4px;color:inherit">Opciones: agregar un flete solo para esta fecha, subir la tolerancia de algún camión o pasar pedidos a otro día.</div></div>`);
   else if(nc&&m.pend.length)h.push(`<div class="rbox warn"><div class="rbh"><b>${m.pend.length} cliente${m.pend.length>1?"s":""} sin camión</b> · ${nf0.format(ci.pendKg)} kg · la capacidad total alcanza: tocá Armar rutas sugeridas o usá la sugerencia de cada cliente</div></div>`);
+  const tardes=m.trucks.flatMap(tr=>tr.st.filter(s=>s.hh&&s.hh.late>0).map(s=>({s,tr})));
+  if(tardes.length)h.push(`<div class="rbox dng"><div class="rbh"><b>${tardes.length} cliente${tardes.length>1?"s":""} fuera de su ventana horaria</b> · ${tardes.map(x=>`${esc(x.s.c.nom)} (${esc(x.tr.t.nombre)}, llega ~${min2hm(x.s.hh.lle)}, recibe hasta ${min2hm(x.s.vent.b)})`).join(" · ")}</div><div class="note" style="margin-top:4px;color:inherit">Probá Armar rutas sugeridas, mover el cliente a otro camión o cambiar el orden con ↑↓.</div></div>`);
+  // Horarios: si la matriz de tiempos por calle no cubre las paradas, se pide una vez en segundo plano.
+  const ptsM=[...m.trucks.filter(x=>x.st.length).flatMap(x=>[x.t.dep,...x.st])];
+  if(ptsM.length&&!S.matPend&&Date.now()-(S.matFallo||0)>60000&&!(S.mat&&S.mat.min&&ptsM.every(p=>S.mat.idx.has(pk(p))))){
+    S.matPend=true;cargarMatriz([...(S.log.depositos||[]).filter(d=>d.lat!=null),...m.ok]).then(ok=>{S.matPend=false;if(ok)renderRuteo(true);else S.matFallo=Date.now()})}
   if(ci.excedidos.length)h.push(`<div class="rbox warn"><div class="rbh"><b>Pasan la tolerancia:</b> ${ci.excedidos.map(x=>`${esc(x.t.nombre)} por ${nf0.format(x.kg-capTol(x.t))} kg`).join(" · ")}</div></div>`);
   const ubRow=(s,extra)=>`<div class="rbr"><span>${esc(s.c.nom)} <span class="note">#${esc(s.id)} · ${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", ")||"sin dirección")}${extra||""}</span></span><span class="acts"><button class="btn sm pri" data-pick="${esc(s.id)}">Marcar en el mapa</button><input class="inp" data-coord="${esc(s.id)}" placeholder="o pegá coordenadas / link"><button class="btn sm" data-coordok="${esc(s.id)}">Guardar</button></span></div>`;
   if(m.sin.length)h.push(`<div class="rbox dng"><div class="rbh"><b>${m.sin.length} sin ubicación</b> · no se pueden rutear hasta ubicarlos<span class="sp"></span><button class="btn sm" data-geo="sin">Ubicar todos con Google</button></div>${m.sin.map(s=>ubRow(s)).join("")}</div>`);
@@ -2005,14 +2070,20 @@ function renderRuteo(force){
   const sugHtml=s=>{const g=sugerencia(s,m);if(!g)return "";const cap=capTol(g.tr.t);
     return `<div class="sug">Sugerido: <b>${esc(g.tr.t.nombre)}</b> · +${nf0.format(g.c.min)} min · +${nf1.format(g.c.km)} km${g.c.pen?` · <span class="pasa">fuera de su zona</span>`:""} · queda en ${nf0.format(g.kg)} / ${nf0.format(g.tr.t.capKg||0)} kg${g.entra?"":` · <span class="pasa">se pasa ${nf0.format(g.kg-cap)} kg de la tolerancia</span>`} <button class="btn sm${g.entra?" pri":""}" data-sug="${esc(s.id)}" data-to="${esc(g.tr.t.id)}" data-pos="${g.c.pos}">Mover</button></div>`};
   const zonaChip=(s,tid)=>{const t=tid&&camById(tid);if(!t||!pen(t.dep,s))return "";const d=(S.log.depositos||[]).find(x=>x.id===zonaDe(s));return ` <span class="chip st warn" title="Su zona sale de ${esc(d?d.nombre:"otro depósito")}">fuera de zona</span>`};
-  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
+  const tpv=TP();
+  // Horario de la parada: llegada estimada, ventana del cliente y avisos de espera larga o llegada tarde.
+  const horaHtml=(s,k)=>{const v=s.vent,hh=k!=null?s.hh:null;const p=[];
+    if(hh)p.push(`Llega ~<b>${min2hm(hh.lle)}</b>`);if(v)p.push(`recibe ${ventTxt(v)}`);else if(s.ventTxt)p.push(`<span title="${esc(s.ventTxt)}">ventana sin formato</span>`);
+    let chip="";if(hh&&hh.late>0)chip=` <span class="chip st dng">llega tarde (+${nf0.format(hh.late+tpv.tol)} min)</span>`;else if(hh&&hh.w>tpv.tol)chip=` <span class="chip st warn">espera ${nf0.format(hh.w)} min</span>`;else if(hh&&hh.w>=1)p.push(`espera ${nf0.format(hh.w)} min`);
+    return p.length||chip?`<div class="note hora">${p.join(" · ")}${chip}</div>`:""};
+  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}${horaHtml(s,k)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
     <div class="rsa">${tid?`<button class="btn sm" data-up="${esc(s.id)}" aria-label="Subir">↑</button><button class="btn sm" data-dn="${esc(s.id)}" aria-label="Bajar">↓</button>`:""}<button class="btn sm" data-pick="${esc(s.id)}" title="Corregir el punto haciendo clic en el mapa">📍</button><select class="inp" data-mv="${esc(s.id)}" aria-label="Mover a">${opts(tid||"none")}</select></div></li>`;
   const colBtn=(id,n)=>n?`<button class="btn sm" data-col="${esc(id)}" aria-expanded="${!S.col.has(id)}">${S.col.has(id)?"Ver paradas":"Ocultar paradas"}</button>`:"";
   const resumen=m.trucks.length?rutaResumen(m):"";
   const cards=m.trucks.map((tr,i)=>{const col=PAL[i%PAL.length];const cap=tr.t.capKg||0,capT=capTol(tr.t);const pct=cap?tr.kg/cap*100:0;const st=tr.kg>capT?"dng":tr.kg>cap?"warn":"ok";const cerrada=S.col.has(tr.t.id);
     return `<div class="panel rcard" data-tid="${esc(tr.t.id)}"><div class="ph"><span class="rsw" style="background:${col}"></span><h2 style="margin:0">${esc(tr.t.nombre)}</h2><span class="note">${esc(tr.t.dep.nombre)}</span>${tr.t.flete?`<span class="chip warn">Flete · solo esta fecha</span>`:""}<span class="sp"></span><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)} kg</span>${colBtn(tr.t.id,tr.st.length)}</div>
      <div class="pb">${tr.t.flete?`<div class="clrow" style="margin-bottom:10px"><label class="tgl">Nombre <input class="inp" data-fl="${esc(tr.t.id)}" data-campo="nombre" value="${esc(tr.t.nombre)}" style="width:140px"></label><label class="tgl">Capacidad <input class="inp num" data-fl="${esc(tr.t.id)}" data-campo="capKg" value="${tr.t.capKg||0}" inputmode="numeric" style="width:80px"> kg</label><label class="tgl">Sale de <select class="inp" data-fl="${esc(tr.t.id)}" data-campo="dep">${(S.log.depositos||[]).map(d=>`<option value="${esc(d.id)}"${d.id===tr.t.dep.id?" selected":""}>${esc(d.nombre)}</option>`).join("")}</select></label><button class="btn sm dng" data-delflete="${esc(tr.t.id)}">Quitar flete</button></div>`:""}<div class="rbar"><span style="width:${Math.min(100,pct)}%;background:${st==="ok"?"var(--verde)":st==="warn"?"var(--amarillo-osc)":"var(--danger)"}"></span></div>
-     <div class="note" style="margin:6px 0 8px">${tr.st.length} paradas · ${nf1.format(tr.caj)} CAJ · ${moneyShort(tr.imp)} · ${kmTxt(tr)}${tr.t.tol?` · tolerancia +${tr.t.tol}%`:""}</div>
+     <div class="note" style="margin:6px 0 8px">${tr.st.length} paradas · ${nf1.format(tr.caj)} CAJ · ${moneyShort(tr.imp)} · ${kmTxt(tr)}${tr.t.tol?` · tolerancia +${tr.t.tol}%`:""}${tr.st.length?` · sale ${min2hm(tpv.sal)}, vuelve ~<b>${min2hm(tr.h.vuelta)}</b>`:""}${tr.h.nTarde?` · <span class="pasa">${tr.h.nTarde} fuera de horario</span>`:""}</div>
      ${tr.st.length&&cerrada?"":tr.st.length?`<ol class="rstops">${tr.st.map((s,k)=>stopRow(s,k,col,tr.t.id)).join("")}</ol>
      <div class="ract"><button class="btn sm" data-opt="${esc(tr.t.id)}">Optimizar orden</button>${tr.real?"":`<button class="btn sm" data-real="${esc(tr.t.id)}"${con?"":" disabled"}>Km por calles</button>`}<button class="btn sm" data-pdf="${esc(tr.t.id)}">PDF de carga</button><button class="btn sm" data-hr="${esc(tr.t.id)}">Copiar hoja de ruta</button><button class="btn sm" data-hc="${esc(tr.t.id)}">Copiar hoja de carga</button>${gmapsLinks(tr.t.dep,tr.st).map((u,k,a)=>`<a class="btn sm pri" href="${esc(u)}" target="_blank" rel="noopener">Google Maps${a.length>1?" tramo "+(k+1):""}</a>`).join("")}</div>`:`<div class="note">Sin paradas asignadas.</div>`}</div></div>`}).join("");
   const pend=m.pend.length?`<div class="panel rcard" data-tid="none"><div class="ph"><span class="rsw" style="background:#6b7280"></span><h2 style="margin:0">Sin camión</h2><span class="note">${m.pend.length} cliente${m.pend.length>1?"s":""}</span><span class="sp"></span><span class="chip">${nf0.format(m.pend.reduce((a,s)=>a+s.kg,0))} kg</span>${colBtn("none",m.pend.length)}</div>${S.col.has("none")?"":`<div class="pb"><ol class="rstops">${m.pend.map(s=>stopRow(s,null,"#6b7280",null)).join("")}</ol></div>`}</div>`:"";
@@ -2082,7 +2153,15 @@ function zonasCfgHtml(){
   return `<div class="ldep"><div class="clrow"><b style="font-size:15px">Cómo se arman las rutas</b></div>
     <div class="clrow"><label class="tgl">Medir en <select class="inp" id="lgMed"><option value="min"${d.medida!=="km"?" selected":""}>Minutos de manejo</option><option value="km"${d.medida==="km"?" selected":""}>Kilómetros</option></select></label>
     <label class="tgl">Zonas <select class="inp" id="lgZm"><option value="fija"${(d.zonaModo||"fija")==="fija"?" selected":""}>Fijas: pasa al otro depósito solo si no entra</option><option value="preferida"${d.zonaModo==="preferida"?" selected":""}>Preferidas: pasa si ahorra más de 30 min</option><option value="no"${d.zonaModo==="no"?" selected":""}>No usar zonas</option></select></label></div>
-    <div class="note">Los minutos son sin tránsito. Las zonas ponen la experiencia de los choferes: qué depósito sale para cada lado.</div></div>
+    <div class="note">Las zonas ponen la experiencia de los choferes: qué depósito sale para cada lado.</div>
+    <div class="clrow" style="margin-top:10px"><b>Horarios</b></div>
+    <div class="clrow">
+      <label class="tgl">Salida de los camiones <input class="inp" type="time" id="lgSal" value="${esc(d.salida||"06:00")}" style="width:110px"></label>
+      <label class="tgl">Por cliente <input class="inp num" id="lgPar" value="${d.minParada>=0?d.minParada:10}" inputmode="decimal"> min</label>
+      <label class="tgl">más <input class="inp num" id="lgBlt" value="${d.segBulto>=0?d.segBulto:20}" inputmode="decimal"> seg por bulto (CAJ)</label>
+      <label class="tgl">Tolerancia de ventana <input class="inp num" id="lgTol" value="${d.tolVent>=0?d.tolVent:20}" inputmode="numeric"> min</label>
+      <label class="tgl">Factor de tránsito × <input class="inp num" id="lgFtr" value="${String(d.factorTr>0?d.factorTr:1.3).replace(".",",")}" inputmode="decimal"></label></div>
+    <div class="note">Factor de tránsito: los tiempos del mapa son sin tránsito y se multiplican por este número. Para ajustarlo, compará la hora real de vuelta de un camión con la estimada: si tardó un 20% más de lo previsto, subilo un 20% (por ejemplo de 1,3 a 1,55). Si volvió antes, bajalo.</div></div>
    <details class="ldep" id="lgZonas"${S.zOpen?" open":""}><summary><b style="font-size:15px">Zonas por depósito</b> <span class="note">· ${ciu.length} localidades · ${asig} con depósito fijo</span></summary>
     <div class="clrow" style="margin:8px 0"><input type="search" class="inp" id="lgZq" placeholder="Buscar localidad" value="${esc(S.zq)}" style="width:200px"><button class="btn sm" id="lgZprop">Proponer por tiempo de manejo</button><span class="note">Completa las que están en "Cualquiera": el depósito más rápido si gana por 5 min o más, y Capital desde Hurlingham, Pilar desde Escobar.</span></div>
     <table class="cat zon"><thead><tr><th>Localidad</th><th class="n">Clientes</th>${deps.map(p=>`<th class="n">Min. desde ${esc(p.nombre)}</th>`).join("")}<th>Sale de</th></tr></thead><tbody>
@@ -2112,7 +2191,9 @@ $("#rtCfg").addEventListener("toggle",e=>{if(e.target.id==="lgZonas")S.zOpen=e.t
   if(ev==="click"?t.closest("[data-addcam],[data-delcam]"):(t.id!=="lgZq"&&t.closest("input,select")))logDirty=true},true));
 $("#rtCfg").addEventListener("change",e=>{const t=e.target;
   if(t.dataset.zc!=null){logDraft.zonas=logDraft.zonas||{};if(t.value)logDraft.zonas[t.dataset.zc]=t.value;else delete logDraft.zonas[t.dataset.zc];return}
-  if(t.id==="lgMed")logDraft.medida=t.value;if(t.id==="lgZm")logDraft.zonaModo=t.value});
+  if(t.id==="lgMed")logDraft.medida=t.value;if(t.id==="lgZm")logDraft.zonaModo=t.value;
+  if(t.id==="lgSal"&&hm2min(t.value)!=null)logDraft.salida=t.value;
+  const num={lgPar:"minParada",lgBlt:"segBulto",lgTol:"tolVent",lgFtr:"factorTr"}[t.id];if(num){const v=parseNum(t.value);if(v>=0)logDraft[num]=num==="factorTr"?Math.max(0.5,Math.min(3,v||1.3)):v}});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;if(t.id!=="lgZq")return;S.zq=t.value;const q=normCiu(t.value);
   document.querySelectorAll("#lgZonas tr[data-zk]").forEach(tr=>{tr.hidden=!!q&&!tr.dataset.zk.includes(q)})});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;const dv=t.closest("[data-di]");

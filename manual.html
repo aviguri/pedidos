@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual · Pedidos AVIGURI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--verde:#026937;--verde-osc:#01441f;--verde-claro:#4a9b6e;--amarillo:#F6C65B;--bg:#f4f6f4;--surface:#fff;--ink:#1d2a22;--muted:#5d6b62;--line:#dde5df;--soft:#e8f2ec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111714;--surface:#1a221d;--ink:#e6eee9;--muted:#9fb0a6;--line:#2b3a31;--soft:#20302a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.6 Nunito,system-ui,sans-serif}
+header{background:linear-gradient(120deg,var(--verde-osc),var(--verde) 60%,var(--verde-claro));color:#fff;padding:26px 16px 30px;position:relative;overflow:hidden}
+header:after{content:"";position:absolute;right:-60px;top:-40px;width:340px;height:200px;border-radius:50%;background:var(--amarillo);opacity:.85;transform:rotate(-18deg)}
+header .in{max-width:980px;margin:0 auto;position:relative;z-index:1}
+header h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.3px}
+header p{margin:4px 0 0;opacity:.9;font-weight:600}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px;display:grid;grid-template-columns:230px 1fr;gap:24px}
+nav{position:sticky;top:12px;align-self:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+nav b{display:block;margin-bottom:6px}
+nav a{display:block;color:var(--ink);text-decoration:none;padding:3px 0}
+nav a:hover{color:var(--verde-claro)}
+main section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 22px 16px;margin-bottom:18px}
+h2{font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+h2:before{content:"";width:10px;height:10px;border-radius:50%;background:var(--amarillo);flex:none}
+h3{font-size:16px;font-weight:800;margin:16px 0 4px;color:var(--verde-claro)}
+p,li{margin:4px 0}
+ul,ol{padding-left:20px;margin:4px 0}
+code,kbd{background:var(--soft);border-radius:5px;padding:1px 6px;font-size:13.5px}
+.tip{background:var(--soft);border-left:4px solid var(--verde-claro);border-radius:6px;padding:8px 12px;margin:10px 0}
+.warn{background:rgba(246,198,91,.18);border-left:4px solid var(--amarillo);border-radius:6px;padding:8px 12px;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-weight:800}
+.cambios li{margin:6px 0}
+.fecha{font-weight:800;color:var(--verde-claro)}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}nav{position:static}}
+@media print{nav,header:after{display:none}.wrap{display:block}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 13/11/2026</p></div></header>
+<div class="wrap">
+<nav>
+  <b>Contenido</b>
+  <a href="#acceso">1. Acceso</a>
+  <a href="#pedidos">2. Pedidos</a>
+  <a href="#lista">3. Pedidos del día</a>
+  <a href="#clientes">4. Clientes</a>
+  <a href="#consolidado">5. Consolidado</a>
+  <a href="#ruteo">6. Ruteo</a>
+  <a href="#config">7. Depósitos, horarios y zonas</a>
+  <a href="#ubicaciones">8. Ubicaciones</a>
+  <a href="#datos">9. Datos</a>
+  <a href="#admin">10. Administración</a>
+  <a href="#problemas">11. Problemas frecuentes</a>
+  <a href="#cambios">12. Historial de cambios</a>
+</nav>
+<main>
+
+<section id="acceso">
+<h2>1. Acceso</h2>
+<ul>
+  <li><b>Dirección:</b> <a href="https://aviguri.github.io/pedidos/">aviguri.github.io/pedidos</a>. Funciona en la PC y en el celular.</li>
+  <li><b>Ingresar:</b> con tu usuario y contraseña. Los crea el administrador en Datos › Usuarios. La sesión queda abierta en ese navegador hasta que tocás <b>Salir</b>.</li>
+  <li><b>Cambiar contraseña:</b> botón arriba a la derecha. Al cambiarla se cierran tus sesiones en otros equipos.</li>
+  <li><b>Si te olvidaste la contraseña:</b> pedile una nueva al administrador.</li>
+  <li><b>Actualización:</b> lo que cargan los demás aparece solo en hasta 15 segundos. El botón <b>Actualizar</b> lo trae en el momento.</li>
+  <li><b>Manual:</b> el botón <b>Manual</b> de arriba abre esta página.</li>
+</ul>
+<div class="tip">Cada pedido guarda quién lo tomó y quién lo modificó, con la hora. Por eso cada persona tiene que entrar con su propio usuario.</div>
+</section>
+
+<section id="pedidos">
+<h2>2. Pedidos: tomar un pedido</h2>
+<h3>Fecha de entrega</h3>
+<p>Arriba de todo está la fecha de entrega, con flechas para pasar de día. Por defecto es mañana. Todo lo que se ve (pedidos, consolidado, ruteo) es de esa fecha.</p>
+<h3>Buscar el cliente</h3>
+<ul>
+  <li>Escribí parte del nombre, el número de cliente o la ciudad y elegilo de la lista (o Enter).</li>
+  <li><b>Un pedido por cliente y día:</b> si el cliente ya tiene pedido para esa fecha, se abre para editarlo.</li>
+  <li>Si el cliente todavía no está en el sistema, usá <b>+ Cliente nuevo (provisorio)</b>, debajo del buscador. Ver <a href="#provisorios">clientes provisorios</a>.</li>
+</ul>
+<h3>Cargar productos</h3>
+<ul>
+  <li><b>Habituales del cliente</b> arriba: lo que más compró. Después los productos "siempre visibles" y el campo <b>Agregar otro producto</b>.</li>
+  <li>De cada producto se ve el último precio, la última cantidad y la fecha de esa compra.</li>
+  <li>Botones <b>+ / −</b> con el paso de cada producto, o escribir la cantidad. El trozado se carga en kg.</li>
+  <li><b>Observaciones:</b> quedan resaltadas en amarillo en la lista, la hoja de ruta y el PDF.</li>
+  <li><b>Estado:</b> Pendiente o Confirmado.</li>
+</ul>
+<h3>Botones del pedido</h3>
+<table>
+  <tr><th>Botón</th><th>Qué hace</th></tr>
+  <tr><td>Guardar pedido</td><td>Lo guarda en la planilla (tarda 1 o 2 segundos).</td></tr>
+  <tr><td>Repetir último pedido</td><td>Copia los productos del último pedido de ese cliente (o de esa sucursal).</td></tr>
+  <tr><td>Copiar para WhatsApp</td><td>Copia el pedido como texto para pegar.</td></tr>
+  <tr><td>Anular</td><td>Se confirma en dos pasos. El pedido queda anulado (se ve con "Ver anulados").</td></tr>
+  <tr><td>Cancelar</td><td>Cierra sin guardar.</td></tr>
+</table>
+<div class="warn"><b>Si otra persona modificó el mismo pedido</b> mientras lo editabas, la app avisa y muestra lo que guardó la otra persona. Revisalo y, si querés dejar el tuyo, tocá Guardar otra vez: queda registrado en el historial.</div>
+<h3>Sucursales</h3>
+<ul>
+  <li>Algunos clientes tienen varios lugares de entrega con la misma cuenta corriente.</li>
+  <li>La <b>principal</b> es la dirección de PEDIDOS BD. Las demás se cargan con <b>+ Sucursal</b> (cualquier usuario puede).</li>
+  <li>Arriba del editor aparece <b>Entregar en:</b> con una ✓ en las que ya tienen pedido. Cada sucursal tiene su propio pedido del día.</li>
+  <li>Al guardar una, la app sigue con la próxima sucursal sin pedido (Esc para terminar).</li>
+  <li>Precios, habituales y saldo son siempre los del cliente.</li>
+</ul>
+<h3 id="provisorios">Clientes provisorios</h3>
+<ul>
+  <li>Para clientes que todavía no están dados de alta. Reciben un código P001, P002… y se usan igual que cualquier cliente: pedidos, ruteo, sucursales.</li>
+  <li>Cuando el cliente entra con PEDIDOS BD, en <b>Datos › Clientes provisorios</b> se toca <b>Vincular</b>: sus pedidos, ubicación, sucursales y rutas pasan al cliente real.</li>
+  <li>No deja vincular si el cliente real ya tiene pedido el mismo día que el provisorio.</li>
+</ul>
+<h3>Historial del pedido</h3>
+<p>Cada pedido guarda sus últimos 30 cambios, con quién y cuándo, por ejemplo "A6 300→350 · +CT 200 kg".</p>
+</section>
+
+<section id="lista">
+<h2>3. Pedidos del día</h2>
+<p>Debajo del editor está la lista de pedidos de la fecha: número, cliente, productos con su código, CAJ, importe, estado, quién lo tomó y quién lo modificó por última vez. Tocá una fila para abrir el pedido.</p>
+<h3>Filtros</h3>
+<ul>
+  <li><b>Vendedor, Responsable y Grupo</b> (los del cliente en PEDIDOS BD), con selección múltiple. <b>Quitar filtros</b> los limpia.</li>
+  <li><b>Buscar</b> por cliente, ciudad o producto.</li>
+  <li><b>Mis pedidos:</b> solo los que tomaste o modificaste vos, con un resumen de cuántos, CAJ e importe.</li>
+  <li><b>Ver anulados.</b></li>
+</ul>
+<h3>Ruteo y resumen de lo filtrado</h3>
+<ul>
+  <li><b>Ruteo</b> lleva a la pestaña Ruteo <b>solo los pedidos que se ven en la lista</b>. Así, por ejemplo, filtrando por el responsable de los minoristas se rutean solo esos y queda afuera el interior.</li>
+  <li><b>Copiar resumen</b> copia un resumen detallado de lo que se ve: filtro aplicado, totales (pedidos, CAJ, kg, pallets, importe), totales por producto y el detalle de cada cliente (dirección, teléfono, vendedor, productos con precio y subtotal, observaciones). Es texto plano: sirve para mail, WhatsApp o Excel.</li>
+  <li>Cuando hay filtros, los botones muestran cuántos pedidos incluyen, por ejemplo <b>Ruteo (20)</b>.</li>
+</ul>
+</section>
+
+<section id="clientes">
+<h2>4. Clientes (lista para llamar)</h2>
+<ul>
+  <li>Muestra los clientes que compraron en las últimas N semanas (3 por defecto) y, si querés, las altas nuevas sin compras de los últimos N días.</li>
+  <li>Filtros por Vendedor, Responsable y Grupo, y búsqueda.</li>
+  <li>Se ordena tocando el título de cada columna (▲▼): última compra, compras, CAJ, cliente, ciudad, grupo, vendedor, responsable.</li>
+  <li>Arriba van los que ya tienen pedido para la fecha (se pueden ocultar).</li>
+  <li><b>Tomar pedido</b> o <b>Editar</b> abre el pedido y al guardar vuelve a la lista.</li>
+  <li><b>Ruteo</b> lleva al Ruteo los clientes de la lista que tienen pedido. <b>Copiar lista</b> y <b>Descargar Excel</b>.</li>
+  <li>La columna "Días de compra" muestra qué días de la semana suele comprar cada cliente.</li>
+</ul>
+</section>
+
+<section id="consolidado">
+<h2>5. Consolidado</h2>
+<ul>
+  <li>Totales por producto del día, en cantidad, CAJ y pallets.</li>
+  <li>Matriz de clientes × productos.</li>
+  <li><b>Excel del día</b> (hojas Pedidos y Matriz) y <b>Copiar resumen WhatsApp</b> con todos los pedidos del día.</li>
+</ul>
+<div class="tip"><b>CAJ</b> es la unidad común (cajas y cajones). El trozado se vende en kg y se pasa a CAJ con su peso por caja. Los pallets solo aparecen en el consolidado, los resúmenes y el Excel.</div>
+</section>
+
+<section id="ruteo">
+<h2>6. Ruteo</h2>
+<h3>Qué entra al ruteo</h3>
+<ul>
+  <li>Los pedidos del día, o solo los que mandaste desde Pedidos o Clientes con el botón Ruteo. Arriba dice qué se está ruteando y está el botón <b>Usar todos los pedidos del día</b>.</li>
+  <li><b>Sin ubicación</b> (aviso rojo): no se pueden rutear. Se ubican con <b>Marcar en el mapa</b>, pegando coordenadas o un link de Google Maps, o con <b>Ubicar todos con Google</b>.</li>
+  <li><b>Ubicación aproximada</b> (solo la ciudad) o dirección cambiada: se rutean, pero conviene ubicarlos bien.</li>
+  <li><b>Interior / flete:</b> los que están a más de 150 km del depósito más cercano quedan aparte.</li>
+</ul>
+<h3>Armar rutas sugeridas</h3>
+<p>El botón reparte los pedidos entre los camiones y ordena las paradas. Tarda unos segundos ("Armando…"). Lo que busca, en este orden:</p>
+<ol>
+  <li><b>Entregar todo lo que entra:</b> la capacidad de cada camión más su tolerancia es un límite. Si no entra todo, quedan afuera los clientes que más tiempo agregan.</li>
+  <li><b>Cumplir los horarios de entrega</b> de los clientes que tienen ventana horaria (ver abajo).</li>
+  <li><b>Respetar las zonas:</b> cada localidad sale del depósito que le corresponde.</li>
+  <li><b>El menor tiempo de manejo total</b> entre todos los camiones (o los menores km, si así está configurado).</li>
+</ol>
+<p>Los tiempos y distancias son por calle, de un servicio de mapas gratuito (OSRM). Si no responde, se estiman en línea recta y la app lo avisa.</p>
+<h3>Horarios y ventanas de entrega</h3>
+<ul>
+  <li>Cada parada muestra la <b>hora estimada de llegada</b>. Cada camión muestra a qué hora sale y a qué hora vuelve.</li>
+  <li>La ventana horaria del cliente sale de la columna <b>VENTANA_HORARIO</b> de PEDIDOS BD, con el formato <code>09:30&gt;&gt;11:00</code> (recibe de 9:30 a 11:00).</li>
+  <li><b>Si llega antes</b> de que abra, el camión espera. Hasta 20 minutos de espera se toma como normal; más que eso el armado lo evita.</li>
+  <li><b>Si llega después</b> del cierre, hasta 20 minutos está bien (tolerancia). Más tarde se marca en rojo <b>llega tarde</b> y aparece un aviso arriba.</li>
+  <li>Los clientes <b>sin ventana</b> no tienen restricción de horario. Las sucursales tampoco.</li>
+  <li>No es una regla fija: si un día no hay forma de cumplir con todos, igual arma las rutas y avisa a quiénes llega tarde.</li>
+  <li>El tiempo de cada parada es: <b>minutos por cliente</b> (10) + <b>segundos por bulto</b> (20 por CAJ). Por ejemplo, 15 CAJ son 10 + 5 = 15 minutos.</li>
+</ul>
+<h3>Tarjeta de cada camión</h3>
+<ul>
+  <li>Barra de kg contra capacidad: verde, amarillo si está dentro de la tolerancia, rojo si la pasa.</li>
+  <li>Paradas, CAJ, importe, km, hora de salida y de vuelta.</li>
+  <li>Cada parada: llegada estimada, ventana, avisos ("llega tarde", "espera 35 min", "fuera de zona", "aprox."), observaciones.</li>
+  <li><b>↑ ↓</b> cambia el orden; el desplegable mueve la parada a otro camión; 📍 corrige el punto en el mapa.</li>
+  <li><b>Optimizar orden</b> reordena solo ese camión.</li>
+  <li><b>Km por calles</b> calcula el recorrido real con Google y lo dibuja en el mapa.</li>
+  <li><b>PDF de carga</b>, <b>Copiar hoja de ruta</b>, <b>Copiar hoja de carga</b> y links de <b>Google Maps</b> (de a 10 paradas).</li>
+  <li><b>Ocultar paradas</b> contrae la tarjeta.</li>
+</ul>
+<h3>Resumen de camiones</h3>
+<p>Tabla con todos los camiones: clientes, CAJ, kg contra capacidad, importe, km, manejo y hora de vuelta. Tiene botones <b>PDF</b> por depósito y para todos. Tocá una fila para ir a ese camión.</p>
+<h3>PDF de carga</h3>
+<ul>
+  <li>Una hoja por camión: encabezado con depósito, fecha, entregas, CAJ, kg, km, importe y horarios.</li>
+  <li>Mercadería total por producto con la columna <b>Cargado</b> para tildar. Se carga al revés: la última entrega va al fondo.</li>
+  <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma.</li>
+</ul>
+<h3>Fletes y falta de capacidad</h3>
+<ul>
+  <li>Si los pedidos superan la capacidad total, aparece cuántos kg faltan y el botón <b>Agregar flete</b>: un camión extra solo para esa fecha, con nombre, capacidad y depósito editables.</li>
+  <li>Los clientes sin camión muestran una sugerencia ("Sugerido: Daily · +12 min") con el botón <b>Mover</b>.</li>
+</ul>
+</section>
+
+<section id="config">
+<h2>7. Depósitos, horarios y zonas</h2>
+<p>Al pie del Ruteo, en <b>Depósitos y camiones</b>. Los cambios se aplican al tocar <b>Guardar depósitos y camiones</b>.</p>
+<h3>Depósitos y camiones</h3>
+<ul>
+  <li>Coordenadas de cada depósito.</li>
+  <li>Camiones con nombre, capacidad en kg y tolerancia en % (cuánto se puede pasar de la capacidad).</li>
+  <li>Distancia a partir de la cual un cliente es "interior" (150 km).</li>
+</ul>
+<h3>Cómo se arman las rutas</h3>
+<ul>
+  <li><b>Medir en:</b> minutos de manejo (recomendado) o kilómetros.</li>
+  <li><b>Zonas:</b> fijas (sale del otro depósito solo si no entra en los camiones del suyo), preferidas (también si ahorra más de 30 minutos) o no usar.</li>
+</ul>
+<h3>Horarios</h3>
+<table>
+  <tr><th>Dato</th><th>Valor inicial</th><th>Para qué</th></tr>
+  <tr><td>Salida de los camiones</td><td>06:00</td><td>Hora de salida de todos los camiones.</td></tr>
+  <tr><td>Por cliente</td><td>10 min</td><td>Tiempo fijo de cada entrega.</td></tr>
+  <tr><td>Por bulto</td><td>20 seg por CAJ</td><td>Se suma al tiempo de cada entrega según su cantidad.</td></tr>
+  <tr><td>Tolerancia de ventana</td><td>20 min</td><td>Espera aceptable antes de que abra, y margen después del cierre.</td></tr>
+  <tr><td>Factor de tránsito</td><td>× 1,3</td><td>Los tiempos del mapa son sin tránsito y se multiplican por este número.</td></tr>
+</table>
+<div class="tip"><b>Cómo ajustar el factor de tránsito:</b> anotá a qué hora volvió realmente un camión y comparala con la hora de vuelta estimada. Si tardó un 20% más de lo previsto, subí el factor un 20% (de 1,3 a 1,55). Si volvió antes, bajalo. Conviene mirarlo con dos o tres días distintos.</div>
+<h3>Zonas por depósito</h3>
+<ul>
+  <li>Una tabla con cada localidad donde hay clientes, los minutos de manejo desde cada depósito y de qué depósito sale.</li>
+  <li><b>Proponer por tiempo de manejo</b> completa las que están en "Cualquiera": el depósito más rápido si gana por 5 minutos o más. Además aplica las decisiones tomadas: <b>Capital desde Hurlingham</b> y <b>Pilar</b> (Del Viso, Tortuguitas, Manuel Alberti, Zelaya…) <b>desde Escobar</b>.</li>
+  <li>Las que tienen tiempos parejos quedan en "Cualquiera" y el armado decide cada día.</li>
+  <li>Cada localidad se puede cambiar a mano.</li>
+</ul>
+</section>
+
+<section id="ubicaciones">
+<h2>8. Ubicaciones</h2>
+<ul>
+  <li>Calidad de la ubicación de cada cliente: exacta, calle (sin altura), solo ciudad, manual, sin ubicación y dirección cambiada (la dirección del sistema cambió desde que se ubicó).</li>
+  <li><b>Ubicar con Google</b> para los que no tienen ubicación, tienen solo la ciudad o cambiaron de dirección (hasta 200 por vez).</li>
+  <li>Corregir a mano: pegar coordenadas o un link de Google Maps, o marcar en el mapa. Queda como <b>manual</b>: no se pisa. <b>Quitar</b> vuelve a la ubicación automática.</li>
+  <li>Excel de los clientes a revisar.</li>
+  <li>Los clientes nuevos que entran con PEDIDOS BD no se ubican solos: al importar aparece el botón para ubicarlos.</li>
+</ul>
+</section>
+
+<section id="datos">
+<h2>9. Datos</h2>
+<h3>Subir PEDIDOS BD</h3>
+<ol>
+  <li>En Excel, <b>Actualizar todo</b> y guardar.</li>
+  <li>Arrastrar el archivo a la pestaña Datos (funciona aunque esté abierto en Excel).</li>
+  <li>Revisar el resumen y tocar <b>Actualizar base</b>.</li>
+</ol>
+<table>
+  <tr><th>Hoja</th><th>Qué se toma</th></tr>
+  <tr><td>CLIENTES_BD</td><td>ID_CLI, CLIENTE, DIRECCION, CIUDAD_CP, TELEFONO, VENTANA_HORARIO, FECHA_ALTA, GRUPO_CLIENTE, RESPONSABLE, VENDEDOR</td></tr>
+  <tr><td>VENTAS</td><td>Últimos precios por cliente y producto, y actividad de compras (por ID_ART)</td></tr>
+  <tr><td>SALDOS ACTUALES</td><td>Saldo, crédito, última compra y último pago</td></tr>
+</table>
+<p>Los artículos nuevos se dan de alta solos con un código editable. Se excluyen los ajustes (DIFERENCIA, BONIFICACION, DECOMISO, NO REGISTRADO).</p>
+<h3>Ventanas horarias a corregir</h3>
+<p>Lista de clientes que tienen algo en VENTANA_HORARIO que no respeta el formato <code>09:30&gt;&gt;11:00</code> (por ejemplo formas de pago). El ruteo los toma sin horario. <b>Copiar lista</b> la pasa a Excel para corregirla en el sistema.</p>
+<h3>Productos</h3>
+<p>Catálogo editable: código corto, ID de artículo, nombre, tipo, unidad (CAJ o kg), peso por caja, paso del +/−, precio de lista, activo y "siempre visible". También los CAJ por pallet.</p>
+<div class="tip"><b>Peso por caja:</b> pollo entero, caja o cajón 20 kg; rebozados y elaborados 5 kg; el trozado va por sus kg.</div>
+<h3>Clientes provisorios y sucursales</h3>
+<p>Listas para revisar y vincular los provisorios, y ver todas las sucursales cargadas.</p>
+<h3>Usuarios (solo administradores)</h3>
+<ul>
+  <li>Crear usuario: nombre, usuario (se sugiere solo), contraseña inicial (<b>Generar</b> inventa una) y rol.</li>
+  <li>Al crearlo aparece un texto con el link, el usuario y la contraseña para mandarle.</li>
+  <li><b>Contraseña nueva</b> cuando alguien se la olvida (cierra sus sesiones), <b>Copiar acceso</b> y <b>Activar / Desactivar</b>.</li>
+  <li>Después de 5 intentos fallidos, el usuario queda bloqueado 10 minutos.</li>
+</ul>
+</section>
+
+<section id="admin">
+<h2>10. Administración</h2>
+<ul>
+  <li><b>Dónde están los datos:</b> en una planilla de Google privada. La página se conecta con un puente de Apps Script (<code>Code.gs</code>).</li>
+  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>7</b>.</li>
+  <li><b>Conexión:</b> solo la ven los administradores. Desde la pantalla de ingreso, "Acceso técnico (administrador)" permite entrar con la clave maestra en caso de emergencia.</li>
+  <li><b>Volver atrás:</b> la página tiene todas sus versiones guardadas y se puede volver a cualquiera en minutos. Code.gs: elegir una versión anterior en Administrar implementaciones. Datos: Archivo › Historial de versiones de la planilla.</li>
+</ul>
+</section>
+
+<section id="problemas">
+<h2>11. Problemas frecuentes</h2>
+<table>
+  <tr><th>Qué pasa</th><th>Qué hacer</th></tr>
+  <tr><td>Vuelve a pedir usuario y contraseña</td><td>La sesión venció o cambiaron tu contraseña. Ingresá de nuevo.</td></tr>
+  <tr><td>No veo un pedido que cargó otra persona</td><td>Esperá unos segundos o tocá Actualizar. Revisá la fecha y los filtros.</td></tr>
+  <tr><td>"Otra persona modificó este pedido"</td><td>Revisá lo que guardó y tocá Guardar otra vez si querés dejar el tuyo.</td></tr>
+  <tr><td>Un cliente no aparece en el Ruteo</td><td>Puede estar sin ubicación (aviso rojo), ser del interior o haber quedado fuera del filtro.</td></tr>
+  <tr><td>Los km dicen "estimados (línea recta)"</td><td>El servicio de mapas no respondió. Probá Armar de nuevo en un rato.</td></tr>
+  <tr><td>Un cliente con horario no lo respeta</td><td>Revisá que su ventana esté en formato 09:30&gt;&gt;11:00 (Datos › Ventanas horarias a corregir).</td></tr>
+  <tr><td>Las horas estimadas no coinciden con la realidad</td><td>Ajustá el factor de tránsito o los minutos por cliente en Depósitos y camiones.</td></tr>
+  <tr><td>No cambia nada después de una actualización</td><td>Recargá la página (F5).</td></tr>
+</table>
+</section>
+
+<section id="cambios">
+<h2>12. Historial de cambios</h2>
+<ul class="cambios">
+  <li><span class="fecha">13/11/2026</span> · Ventanas horarias de entrega (VENTANA_HORARIO de PEDIDOS BD) en el armado de rutas, con tolerancia de 20 min. Hora estimada de llegada por parada y de vuelta por camión, en tarjetas, resumen, PDF y hoja de ruta. Parámetros generales de salida (06:00), minutos por cliente, segundos por bulto y factor de tránsito. Lista de ventanas a corregir en Datos. Este manual. Requiere Code.gs versión 7.</li>
+  <li><span class="fecha">12/11/2026</span> · Filtros por Vendedor, Responsable y Grupo en Pedidos del día. Ruteo y resumen detallado copiable de los pedidos filtrados.</li>
+  <li><span class="fecha">11/11/2026</span> · El armado mide en minutos de manejo y respeta zonas por depósito (Capital desde Hurlingham, Pilar desde Escobar). Filtro "Mis pedidos" con resumen. Control de versiones de todo el sistema.</li>
+  <li><span class="fecha">03/11/2026</span> · Ingreso con usuario y contraseña. Panel de usuarios con texto de acceso para copiar. Conexión visible solo para administradores.</li>
+  <li><span class="fecha">29/10/2026</span> · Botón visible para cargar un cliente provisorio.</li>
+  <li><span class="fecha">28/10/2026</span> · Publicación en aviguri.github.io/pedidos. Armado de rutas con km por calle, movimientos de tramos y "romper y rearmar". PDF de carga.</li>
+  <li><span class="fecha">26/10/2026</span> · Sucursales, clientes provisorios, fletes por fecha y resumen de camiones.</li>
+  <li><span class="fecha">23/10/2026</span> · Versión sobre Google Sheets con mapa con calles, geocodificación y recorridos con Google.</li>
+  <li><span class="fecha">20 al 22/10/2026</span> · Primera versión: pedidos, clientes, consolidado, ubicaciones, ruteo e importación de PEDIDOS BD.</li>
+</ul>
+</section>
+
+</main>
+</div>
+</body>
+</html>
