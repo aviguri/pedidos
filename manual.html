@@ -40,7 +40,7 @@ th{font-weight:800}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 13/11/2026</p></div></header>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 14/11/2026</p></div></header>
 <div class="wrap">
 <nav>
   <b>Contenido</b>
@@ -172,6 +172,8 @@ th{font-weight:800}
 <p>El botón reparte los pedidos entre los camiones y ordena las paradas. Tarda unos segundos ("Armando…"). Lo que busca, en este orden:</p>
 <ol>
   <li><b>Entregar todo lo que entra:</b> la capacidad de cada camión más su tolerancia es un límite. Si no entra todo, quedan afuera los clientes que más tiempo agregan.</li>
+  <li><b>Que salgan todos los camiones disponibles.</b> No hace falta que vayan parejos: un camión puede salir más cargado que otro si va a una zona en particular.</li>
+  <li><b>Que cada camión vuelva a tiempo:</b> de vuelta en el depósito antes de las 13:00, o antes de su propia hora (por ejemplo el camión de Hurlingham que tiene que estar a las 11:00 para el transbordo).</li>
   <li><b>Cumplir los horarios de entrega</b> de los clientes que tienen ventana horaria (ver abajo).</li>
   <li><b>Respetar las zonas:</b> cada localidad sale del depósito que le corresponde.</li>
   <li><b>El menor tiempo de manejo total</b> entre todos los camiones (o los menores km, si así está configurado).</li>
@@ -199,7 +201,13 @@ th{font-weight:800}
   <li><b>Ocultar paradas</b> contrae la tarjeta.</li>
 </ul>
 <h3>Resumen de camiones</h3>
-<p>Tabla con todos los camiones: clientes, CAJ, kg contra capacidad, importe, km, manejo y hora de vuelta. Tiene botones <b>PDF</b> por depósito y para todos. Tocá una fila para ir a ese camión.</p>
+<p>Tabla con todos los camiones: clientes, CAJ, kg contra capacidad, importe, km, manejo y hora de vuelta (en rojo si pasa su límite). Tiene botones <b>PDF</b> por depósito y para todos. Tocá una fila para ir a ese camión.</p>
+<ul>
+  <li><b>Camión que no sale hoy</b> (service u otro motivo): destildalo en la primera columna. Solo vale para esa fecha. Sus paradas quedan "Sin camión": tocá <b>Armar rutas sugeridas</b> para repartirlas. Para que vuelva a salir, tildalo de nuevo.</li>
+  <li>Si un camión no llega a volver antes de su hora, aparece un aviso rojo arriba con la hora estimada.</li>
+</ul>
+<h3>Mapa</h3>
+<p>Muestra los depósitos, las paradas numeradas con el color de cada camión y sus recorridos. El botón <b>⛶ Pantalla completa</b> lo agranda a toda la ventana (también en el celular); se sale con el mismo botón o con Esc.</p>
 <h3>PDF de carga</h3>
 <ul>
   <li>Una hoja por camión: encabezado con depósito, fecha, entregas, CAJ, kg, km, importe y horarios.</li>
@@ -219,7 +227,7 @@ th{font-weight:800}
 <h3>Depósitos y camiones</h3>
 <ul>
   <li>Coordenadas de cada depósito.</li>
-  <li>Camiones con nombre, capacidad en kg y tolerancia en % (cuánto se puede pasar de la capacidad).</li>
+  <li>Camiones con nombre, capacidad en kg, tolerancia en % (cuánto se puede pasar de la capacidad) y <b>De vuelta antes de</b>: una hora propia para ese camión. Si queda vacía vale la hora general. Por ejemplo, 11:00 en el camión de Hurlingham que hace el transbordo entre depósitos.</li>
   <li>Distancia a partir de la cual un cliente es "interior" (150 km).</li>
 </ul>
 <h3>Cómo se arman las rutas</h3>
@@ -231,6 +239,8 @@ th{font-weight:800}
 <table>
   <tr><th>Dato</th><th>Valor inicial</th><th>Para qué</th></tr>
   <tr><td>Salida de los camiones</td><td>06:00</td><td>Hora de salida de todos los camiones.</td></tr>
+  <tr><td>De vuelta en el depósito antes de</td><td>13:00</td><td>Hora límite de vuelta de todos los camiones (salvo los que tienen su propia hora).</td></tr>
+  <tr><td>Que salgan todos los camiones disponibles</td><td>Sí</td><td>El armado usa todos los camiones que salen ese día.</td></tr>
   <tr><td>Por cliente</td><td>10 min</td><td>Tiempo fijo de cada entrega.</td></tr>
   <tr><td>Por bulto</td><td>20 seg por CAJ</td><td>Se suma al tiempo de cada entrega según su cantidad.</td></tr>
   <tr><td>Tolerancia de ventana</td><td>20 min</td><td>Espera aceptable antes de que abra, y margen después del cierre.</td></tr>
@@ -308,6 +318,7 @@ th{font-weight:800}
   <tr><td>Un cliente no aparece en el Ruteo</td><td>Puede estar sin ubicación (aviso rojo), ser del interior o haber quedado fuera del filtro.</td></tr>
   <tr><td>Los km dicen "estimados (línea recta)"</td><td>El servicio de mapas no respondió. Probá Armar de nuevo en un rato.</td></tr>
   <tr><td>Un cliente con horario no lo respeta</td><td>Revisá que su ventana esté en formato 09:30&gt;&gt;11:00 (Datos › Ventanas horarias a corregir).</td></tr>
+  <tr><td>Un camión vuelve después de su hora límite</td><td>Armá de nuevo, pasá clientes a otro camión, agregá un flete o mové pedidos a otro día.</td></tr>
   <tr><td>Las horas estimadas no coinciden con la realidad</td><td>Ajustá el factor de tránsito o los minutos por cliente en Depósitos y camiones.</td></tr>
   <tr><td>No cambia nada después de una actualización</td><td>Recargá la página (F5).</td></tr>
 </table>
@@ -316,6 +327,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">14/11/2026</span> · Mapa en pantalla completa. Hora límite de vuelta al depósito (13:00 general, editable por camión: 11:00 para el transbordo de Hurlingham). Que salgan todos los camiones disponibles. Tilde por fecha para el camión que no sale (service).</li>
   <li><span class="fecha">13/11/2026</span> · Ventanas horarias de entrega (VENTANA_HORARIO de PEDIDOS BD) en el armado de rutas, con tolerancia de 20 min. Hora estimada de llegada por parada y de vuelta por camión, en tarjetas, resumen, PDF y hoja de ruta. Parámetros generales de salida (06:00), minutos por cliente, segundos por bulto y factor de tránsito. Lista de ventanas a corregir en Datos. Este manual. Requiere Code.gs versión 7.</li>
   <li><span class="fecha">12/11/2026</span> · Filtros por Vendedor, Responsable y Grupo en Pedidos del día. Ruteo y resumen detallado copiable de los pedidos filtrados.</li>
   <li><span class="fecha">11/11/2026</span> · El armado mide en minutos de manejo y respeta zonas por depósito (Capital desde Hurlingham, Pilar desde Escobar). Filtro "Mis pedidos" con resumen. Control de versiones de todo el sistema.</li>

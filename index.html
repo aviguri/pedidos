@@ -232,6 +232,12 @@ a.btn{text-decoration:none;display:inline-block}
 .rgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
 @media (min-width:1100px){.rgrid{grid-template-columns:minmax(0,6fr) minmax(0,5fr)}.rmapw{position:sticky;top:180px}}
 #map{height:min(64vh,600px);min-height:360px;border-radius:12px 12px 0 0;background:var(--surface-2);z-index:0}
+.rmapw{position:relative}
+.mapfs{position:absolute;top:10px;right:10px;z-index:500;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+/* Mapa en pantalla completa */
+.rmapw.full{position:fixed!important;inset:0;top:0!important;z-index:2000;border-radius:0;margin:0;display:flex;flex-direction:column}
+.rmapw.full #map{flex:1;height:auto;min-height:0;border-radius:0}
+body.mapfull{overflow:hidden}
 .mapbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line)}
 .pickbar{background:var(--amarillo);color:#3a2a00;font-weight:800;padding:8px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-radius:12px 12px 0 0}
 .pickbar .btn{border-color:#3a2a00;color:#3a2a00}
@@ -1629,7 +1635,12 @@ const durTxt=m=>m>=60?Math.floor(m/60)+" h "+pad(m%60)+" min":m+" min";
 // Fletes: camiones temporales que valen solo para la fecha (se guardan en la ruta del día).
 const fletes=()=>(S.ruta&&S.ruta.fletes)||[];
 const trucksOf=d=>[...(d.camiones||[]),...fletes().filter(f=>f.dep===d.id).map(f=>({...f,flete:true}))];
-const camiones=()=>{const out=[];for(const d of S.log.depositos||[])for(const t of trucksOf(d))out.push({...t,dep:d});return out};
+/* Cada camión lleva su propia copia del depósito con su hora límite de vuelta (_vmax, en minutos): la general (13:00) o la del camión
+   (por ejemplo el de Hurlingham que tiene que estar a las 11:00 para el transbordo). Los camiones destildados para la fecha (ruta.fuera) no salen. */
+const fueraDia=()=>new Set((S.ruta&&S.ruta.fuera)||[]);
+const camionesTodos=()=>{const out=[];const L=S.log||{};const gen=hm2min(L.vueltaMax===undefined?"13:00":L.vueltaMax);
+  for(const d of L.depositos||[])for(const t of trucksOf(d)){const vm=hm2min(t.vueltaMax);out.push({...t,dep:{...d,_vmax:vm!=null?vm:gen,_tid:t.id}})}return out};
+const camiones=()=>{const f=fueraDia();return camionesTodos().filter(t=>!f.has(t.id))};
 const camById=id=>camiones().find(t=>t.id===id);
 const capTol=t=>(t.capKg||0)*(1+(t.tol||0)/100);
 // Lo que agrega al recorrido meter la parada s en el mejor lugar de arr.
@@ -1666,10 +1677,16 @@ function horario(dep,arr,p){p=p||TP();let t=p.sal,prev=dep;const paradas=[];let 
     if(v&&t<v.a){w=v.a-t;t=v.a}
     const late=v?Math.max(0,t-(v.b+p.tol)):0;if(late>0)nTarde++;
     tarde+=late;espera+=w;extra+=Math.max(0,w-p.tol);paradas.push({lle,ini:t,w,late,v});t+=servMin(s,p);prev=s}
-  return {paradas,vuelta:arr.length?t+T(prev,dep)*p.fac:p.sal,tarde,nTarde,espera,extra};
+  const vuelta=arr.length?t+T(prev,dep)*p.fac:p.sal;
+  // Límite de vuelta del camión (14/11): general 13:00 o el propio (ej. 11:00 para el transbordo de Hurlingham).
+  const vmax=dep&&dep._vmax!=null?dep._vmax:null,exceso=vmax!=null?Math.max(0,vuelta-vmax):0;
+  return {paradas,vuelta,tarde,nTarde,espera,extra,vmax,exceso};
 }
-// Costo de las ventanas para el armado: la espera cuenta como tiempo, la espera de más se evita y llegar tarde pesa mucho.
-function ventCost(dep,arr){if(!arr.some(s=>s.vent))return 0;const h=horario(dep,arr);return h.espera+3*h.extra+20*h.tarde}
+// Costo de horarios para el armado: la espera cuenta como tiempo, la espera de más se evita; llegar tarde a un cliente
+// y volver después del límite del camión pesan mucho (20 por minuto).
+function ventCost(dep,arr){if(!arr.length||(!arr.some(s=>s.vent)&&!(dep&&dep._vmax!=null)))return 0;const h=horario(dep,arr);return h.espera+3*h.extra+20*h.tarde+20*h.exceso}
+// Que salgan todos los camiones disponibles (Gere, 14/11): un camión vacío cuesta como 5 horas, así el armado lo usa siempre que pueda.
+const PEN_VACIO=300;const penVacio=()=>S.log&&S.log.usarTodos===false?0:PEN_VACIO;
 let VW=false;   // true cuando alguna parada del armado tiene ventana: los movimientos se evalúan con el recorrido completo
 // Pide a OSRM los km por calle entre todos los puntos, en bloques de 50 × 50 (máximo 100 coordenadas por consulta, 1 por segundo).
 async function cargarMatriz(pts){
@@ -1693,7 +1710,7 @@ async function cargarMatriz(pts){
 function insCost(dep,arr,s){let best={pos:0,d:1e9};
   if(VW){const base=tourCost(dep,arr);for(let i=0;i<=arr.length;i++){const a2=arr.slice();a2.splice(i,0,s);const d=tourCost(dep,a2)-base;if(d<best.d)best={pos:i,d}}}
   else for(let i=0;i<=arr.length;i++){const a=i?arr[i-1]:dep,b=i<arr.length?arr[i]:dep;const d=C(a,s)+C(s,b)-C(a,b);if(d<best.d)best={pos:i,d}}
-  const a=best.pos?arr[best.pos-1]:dep,b=best.pos<arr.length?arr[best.pos]:dep;best.km=D(a,s)+D(s,b)-D(a,b);best.min=T(a,s)+T(s,b)-T(a,b);best.pen=pen(dep,s);if(!VW)best.d+=best.pen;return best}
+  const a=best.pos?arr[best.pos-1]:dep,b=best.pos<arr.length?arr[best.pos]:dep;best.km=D(a,s)+D(s,b)-D(a,b);best.min=T(a,s)+T(s,b)-T(a,b);best.pen=pen(dep,s);if(!VW){best.d+=best.pen;if(!arr.length)best.d-=penVacio()}return best}
 function rutaStops(){
   // Una parada por lugar de entrega (cliente o sucursal). s.c.nom ya trae el nombre de la sucursal para mostrar.
   const ped=S.dia.pedidos||{};
@@ -1717,10 +1734,10 @@ function classify(stops){
 function tourLen(dep,arr,f){f=f||D;if(!arr.length)return 0;let d=f(dep,arr[0]);for(let i=1;i<arr.length;i++)d+=f(arr[i-1],arr[i]);return d+f(arr[arr.length-1],dep)}
 const tourMin=(dep,arr)=>tourLen(dep,arr,T);
 // Lo que minimiza el armado para un camión: recorrido en la medida elegida + penalidades de zona.
-const tourCost=(dep,arr)=>tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0)+ventCost(dep,arr);
+const tourCost=(dep,arr)=>arr.length?tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0)+ventCost(dep,arr):penVacio();
 // 2-opt: da vuelta tramos mientras acorte. Con km por calle la ida y la vuelta pueden diferir, así que se cuenta el tramo invertido completo.
 function twoOpt(dep,arr){
-  if(VW&&arr.some(s=>s.vent)){   // con ventanas el orden cambia los horarios: se evalúa el recorrido completo
+  if(VW){   // con ventanas o límite de vuelta el orden cambia los horarios: se evalúa el recorrido completo
     let cur=arr.slice(),cc=tourCost(dep,cur),improved=true,guard=0;
     while(improved&&guard++<30){improved=false;for(let i=0;i<cur.length-1;i++)for(let k=i+1;k<cur.length;k++){
       const n=cur.slice(0,i).concat(cur.slice(i,k+1).reverse(),cur.slice(k+1));const nc=tourCost(dep,n);if(nc<cc-1e-9){cur=n;cc=nc;improved=true}}}
@@ -1746,7 +1763,7 @@ function optimizeOrder(dep,arr){
 /* Desde el 11/11 el costo es C() (minutos de manejo por defecto) + penalidad por salir de un depósito que no es el de la zona.
    En el código el total sigue llamándose "km" por costumbre, pero es ese costo. */
 const sinI=(arr,i,L)=>{const a=arr.slice();a.splice(i,L||1);return a};
-const removeGain=(dep,arr,i)=>{if(VW)return tourCost(dep,arr)-tourCost(dep,sinI(arr,i));const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return C(a,arr[i])+C(arr[i],b)-C(a,b)+pen(dep,arr[i])};
+const removeGain=(dep,arr,i)=>{if(VW)return tourCost(dep,arr)-tourCost(dep,sinI(arr,i));const a=i?arr[i-1]:dep,b=i<arr.length-1?arr[i+1]:dep;return C(a,arr[i])+C(arr[i],b)-C(a,b)+pen(dep,arr[i])-(arr.length===1?penVacio():0)};
 const solKm=R=>R.reduce((a,r)=>a+tourCost(r.dep,r.st),0);
 const solKmReal=R=>R.reduce((a,r)=>a+tourLen(r.dep,r.st),0);
 const solKg=R=>R.reduce((a,r)=>a+r.kg,0);
@@ -1830,7 +1847,7 @@ async function sugerirRutas(){
     setSync(true,"Pidiendo distancias por calle…");
     const porCalle=await cargarMatriz([...new Map(trucks.map(t=>[t.dep.id,t.dep])).values(),...ok]);
     setSync(true,"Armando rutas…");await new Promise(r=>setTimeout(r,30));
-    VW=ok.some(s=>s.vent);
+    VW=ok.some(s=>s.vent)||trucks.some(t=>t.dep._vmax!=null);
     let x=12345;const rnd=()=>(x=(x*16807)%2147483647)/2147483647;
     let best=null;
     for(const modo of ["lejos","barato","azar","azar","azar","azar","azar"]){const sol=busquedaLocal(construir(ok,trucks,modo,rnd));if(!best||mejorQue(sol,best))best=sol}
@@ -1851,7 +1868,7 @@ async function sugerirRutas(){
 const firma=(t,st)=>t.id+"|"+[t.dep,...st].map(p=>(+p.lat).toFixed(5)+","+(+p.lon).toFixed(5)).join(";");
 function rutaModel(){
   const stops=rutaStops();const cls=classify(stops);const R=S.ruta||{asig:{},orden:{}};const byId=new Map(cls.ok.map(s=>[s.id,s]));
-  VW=cls.ok.some(s=>s.vent);const tp=TP();
+  const tp=TP();VW=cls.ok.some(s=>s.vent)||camiones().some(t=>t.dep._vmax!=null);
   const trucks=camiones().map(t=>{const ids=((R.orden||{})[t.id]||[]).filter(id=>byId.has(id)&&R.asig[id]===t.id);
     for(const id in R.asig)if(R.asig[id]===t.id&&byId.has(id)&&!ids.includes(id))ids.push(id);
     const st=ids.map(id=>byId.get(id));const kg=st.reduce((a,s)=>a+s.kg,0);
@@ -1861,9 +1878,9 @@ function rutaModel(){
   const asigned=new Set(trucks.flatMap(x=>x.st.map(s=>s.id)));const pend=cls.ok.filter(s=>!asigned.has(s.id));
   return {...cls,trucks,pend,total:stops.length};
 }
-const rutaCopy=()=>S.ruta?JSON.parse(JSON.stringify({asig:S.ruta.asig||{},orden:S.ruta.orden||{},real:S.ruta.real||{},fletes:S.ruta.fletes||[]})):{asig:{},orden:{},real:{},fletes:[]};
+const rutaCopy=()=>S.ruta?JSON.parse(JSON.stringify({asig:S.ruta.asig||{},orden:S.ruta.orden||{},real:S.ruta.real||{},fletes:S.ruta.fletes||[],fuera:S.ruta.fuera||[]})):{asig:{},orden:{},real:{},fletes:[],fuera:[]};
 async function saveRuta(r){
-  const doc={asig:r.asig||{},orden:r.orden||{},real:r.real||(S.ruta&&S.ruta.real)||{},fletes:r.fletes||fletes(),sel:S.rutaSel||null,actualizado:Date.now(),por:S.uid||""};S.ruta=doc;renderRuteo(true);
+  const doc={asig:r.asig||{},orden:r.orden||{},real:r.real||(S.ruta&&S.ruta.real)||{},fletes:r.fletes||fletes(),fuera:r.fuera||(S.ruta&&S.ruta.fuera)||[],sel:S.rutaSel||null,actualizado:Date.now(),por:S.uid||""};S.ruta=doc;renderRuteo(true);
   if(!S.db)return;try{await call("guardarRuta",{fecha:S.fecha,ruta:doc})}catch(e){toast("No se pudo guardar la ruta: "+e.message)}
 }
 function moveStop(id,to,pos){const R=rutaCopy();if(to!=="none"&&pos!=null){const tr=rutaModel().trucks.find(x=>x.t.id===to);if(tr)R.orden[to]=tr.st.map(s=>s.id)}
@@ -2019,14 +2036,15 @@ function rutaResumen(m){
   let P=0,C=0,K=0,I=0,KM=0,MIN=0,est=false;
   const fila=(tr,i)=>{const col=PAL[i%PAL.length];const cap=tr.t.capKg||0,capT=capTol(tr.t);const st=tr.kg>capT?"dng":tr.kg>cap?"warn":"ok";const pct=cap?Math.round(tr.kg/cap*100):0;
     const km=tr.real?tr.real.km:tr.km;if(tr.st.length){P+=tr.st.length;C+=tr.caj;K+=tr.kg;I+=tr.imp;KM+=km;if(tr.real)MIN+=tr.real.min;else est=true}
-    return `<tr class="${tr.st.length?"":"vacio"}" data-goto="${esc(tr.t.id)}"><td><span class="rsw" style="background:${col};display:inline-block;vertical-align:-2px"></span> <b>${esc(tr.t.nombre)}</b><div class="note">${esc(tr.t.dep.nombre)}${tr.t.flete?" · flete":""}</div></td>
+    return `<tr class="${tr.st.length?"":"vacio"}" data-goto="${esc(tr.t.id)}"><td><input type="checkbox" data-sale="${esc(tr.t.id)}" checked title="Sale hoy (destildá si el camión no está disponible)" aria-label="${esc(tr.t.nombre)} sale hoy"> <span class="rsw" style="background:${col};display:inline-block;vertical-align:-2px"></span> <b>${esc(tr.t.nombre)}</b><div class="note">${esc(tr.t.dep.nombre)}${tr.t.flete?" · flete":""}</div></td>
       <td class="n">${tr.st.length||"—"}</td><td class="n">${tr.st.length?nf1.format(tr.caj):"—"}</td>
       <td class="n"><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)}</span><div class="note">${pct}%</div></td>
       <td class="n">${tr.st.length?moneyShort(tr.imp):"—"}</td>
       <td class="n">${tr.st.length?(tr.real?`<b>${nf1.format(km)}</b><div class="note">por calles</div>`:`~${nf0.format(km)}<div class="note">estimado</div>`):"—"}</td>
       <td class="n">${tr.real?durTxt(tr.real.min):"—"}</td>
-      <td class="n">${tr.st.length?`~${min2hm(tr.h.vuelta)}${tr.h.nTarde?`<div class="note" style="color:var(--danger)">${tr.h.nTarde} tarde</div>`:""}`:"—"}</td></tr>`};
-  const filas=m.trucks.map(fila).join("");
+      <td class="n">${tr.st.length?`<span${tr.h.exceso>0?' style="color:var(--danger);font-weight:800"':""}>~${min2hm(tr.h.vuelta)}</span>${tr.h.vmax!=null?`<div class="note">límite ${min2hm(tr.h.vmax)}</div>`:""}${tr.h.nTarde?`<div class="note" style="color:var(--danger)">${tr.h.nTarde} tarde</div>`:""}`:"—"}</td></tr>`};
+  const fu=fueraDia();
+  const filas=m.trucks.map(fila).join("")+camionesTodos().filter(t=>fu.has(t.id)).map(t=>`<tr class="vacio nosale"><td><input type="checkbox" data-sale="${esc(t.id)}" title="Tildá para que salga hoy" aria-label="${esc(t.nombre)} sale hoy"> <b>${esc(t.nombre)}</b><div class="note">${esc(t.dep.nombre)} · no sale hoy</div></td><td colspan="7" class="note">No disponible para esta fecha (service u otro motivo).</td></tr>`).join("");
   const pk=m.pend.reduce((a,s)=>a+s.kg,0);
   const sin=m.pend.length?`<tr data-goto="none" class="sinc"><td><span class="rsw" style="background:#6b7280;display:inline-block;vertical-align:-2px"></span> <b>Sin camión</b></td><td class="n">${m.pend.length}</td><td class="n">${nf1.format(m.pend.reduce((a,s)=>a+s.caj,0))}</td><td class="n">${nf0.format(pk)}</td><td class="n">${moneyShort(m.pend.reduce((a,s)=>a+s.imp,0))}</td><td></td><td></td><td></td></tr>`:"";
   const algunaAbierta=m.trucks.some(tr=>tr.st.length&&!S.col.has(tr.t.id))||(m.pend.length&&!S.col.has("none"));
@@ -2035,13 +2053,13 @@ function rutaResumen(m){
   return `<div class="panel"><div class="ph"><h2>Resumen de camiones</h2><span class="sp"></span>${pdfBtns}<button class="btn sm" id="rtColAll">${algunaAbierta?"Ocultar todas las paradas":"Ver todas las paradas"}</button></div>
     <div class="tblwrap"><table class="rsum"><thead><tr><th>Camión</th><th class="n">Clientes</th><th class="n">CAJ</th><th class="n">Kg / capacidad</th><th class="n">Importe</th><th class="n">Km</th><th class="n">Manejo</th><th class="n">Vuelve</th></tr></thead>
     <tbody>${filas}${sin}</tbody><tfoot><tr><td>Total en camiones</td><td class="n">${P}</td><td class="n">${nf1.format(C)}</td><td class="n">${nf0.format(K)} kg</td><td class="n">${moneyShort(I)}</td><td class="n">${est?"~":""}${nf0.format(KM)}</td><td class="n">${MIN&&!est?durTxt(MIN):MIN?"≥ "+durTxt(MIN):"—"}</td><td></td></tr></tfoot></table></div>
-    ${est&&P?`<div class="note" style="padding:8px 16px">Los km con "~" son estimados en línea recta. Tocá <b>Calcular km por calles</b> para comparar con los reales.</div>`:""}</div>`;
+    <div class="note" style="padding:8px 16px">Destildá el camión que no sale hoy (service u otro motivo): solo vale para esta fecha.${est&&P?` Los km con "~" son estimados en línea recta; tocá <b>Calcular km por calles</b> para compararlos con los reales.`:""}</div></div>`;
 }
 function renderRuteo(force){
   const el=$("#rtBody");if(!el||$("#v-ruteo").hidden)return;
   // Con la actualización automática no se pisa lo que se está escribiendo.
   if(!force&&el.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
-  if(!built){el.innerHTML=`<div id="rtHead"></div><div id="rtBoxes"></div><div class="rgrid"><div class="panel rmapw"><div id="pickbar"></div><div id="map"></div><div class="mapbar note" id="mapNote"></div></div><div class="rcards" id="rtCards"></div></div>`;built=true}
+  if(!built){el.innerHTML=`<div id="rtHead"></div><div id="rtBoxes"></div><div class="rgrid"><div class="panel rmapw"><button type="button" class="btn sm mapfs" id="mapFs" title="Ver el mapa en pantalla completa (Esc para salir)">⛶ Pantalla completa</button><div id="pickbar"></div><div id="map"></div><div class="mapbar note" id="mapNote"></div></div><div class="rcards" id="rtCards"></div></div>`;built=true}
   const m=rutaModel();const tot=[...m.ok,...m.interior,...m.sin].reduce((a,s)=>a+s.kg,0);
   $("#rtSel").innerHTML=S.rutaSel?`Ruteando <b>${m.total}</b> pedidos de una selección${S.rutaSelInfo?" ("+esc(S.rutaSelInfo)+")":""} · <button class="btn sm" id="rtAll">Usar todos los pedidos del día</button>`:`Ruteando <b>${m.total}</b> clientes con pedido para el ${esc(dLong(S.fecha))}`;
   const nc=camiones().length;const con=!!S.db;
@@ -2054,6 +2072,8 @@ function renderRuteo(force){
   else if(nc&&m.pend.length)h.push(`<div class="rbox warn"><div class="rbh"><b>${m.pend.length} cliente${m.pend.length>1?"s":""} sin camión</b> · ${nf0.format(ci.pendKg)} kg · la capacidad total alcanza: tocá Armar rutas sugeridas o usá la sugerencia de cada cliente</div></div>`);
   const tardes=m.trucks.flatMap(tr=>tr.st.filter(s=>s.hh&&s.hh.late>0).map(s=>({s,tr})));
   if(tardes.length)h.push(`<div class="rbox dng"><div class="rbh"><b>${tardes.length} cliente${tardes.length>1?"s":""} fuera de su ventana horaria</b> · ${tardes.map(x=>`${esc(x.s.c.nom)} (${esc(x.tr.t.nombre)}, llega ~${min2hm(x.s.hh.lle)}, recibe hasta ${min2hm(x.s.vent.b)})`).join(" · ")}</div><div class="note" style="margin-top:4px;color:inherit">Probá Armar rutas sugeridas, mover el cliente a otro camión o cambiar el orden con ↑↓.</div></div>`);
+  const pasados=m.trucks.filter(tr=>tr.st.length&&tr.h.exceso>0);
+  if(pasados.length)h.push(`<div class="rbox dng"><div class="rbh"><b>${pasados.length} camión${pasados.length>1?"es vuelven":" vuelve"} después de su hora límite</b> · ${pasados.map(tr=>`${esc(tr.t.nombre)}: ~${min2hm(tr.h.vuelta)} (límite ${min2hm(tr.h.vmax)})`).join(" · ")}</div><div class="note" style="margin-top:4px;color:inherit">Probá Armar rutas sugeridas, pasar clientes a otro camión, agregar un flete o mover pedidos a otro día.</div></div>`);
   // Horarios: si la matriz de tiempos por calle no cubre las paradas, se pide una vez en segundo plano.
   const ptsM=[...m.trucks.filter(x=>x.st.length).flatMap(x=>[x.t.dep,...x.st])];
   if(ptsM.length&&!S.matPend&&Date.now()-(S.matFallo||0)>60000&&!(S.mat&&S.mat.min&&ptsM.every(p=>S.mat.idx.has(pk(p))))){
@@ -2079,11 +2099,11 @@ function renderRuteo(force){
   const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}${horaHtml(s,k)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
     <div class="rsa">${tid?`<button class="btn sm" data-up="${esc(s.id)}" aria-label="Subir">↑</button><button class="btn sm" data-dn="${esc(s.id)}" aria-label="Bajar">↓</button>`:""}<button class="btn sm" data-pick="${esc(s.id)}" title="Corregir el punto haciendo clic en el mapa">📍</button><select class="inp" data-mv="${esc(s.id)}" aria-label="Mover a">${opts(tid||"none")}</select></div></li>`;
   const colBtn=(id,n)=>n?`<button class="btn sm" data-col="${esc(id)}" aria-expanded="${!S.col.has(id)}">${S.col.has(id)?"Ver paradas":"Ocultar paradas"}</button>`:"";
-  const resumen=m.trucks.length?rutaResumen(m):"";
+  const resumen=camionesTodos().length?rutaResumen(m):"";
   const cards=m.trucks.map((tr,i)=>{const col=PAL[i%PAL.length];const cap=tr.t.capKg||0,capT=capTol(tr.t);const pct=cap?tr.kg/cap*100:0;const st=tr.kg>capT?"dng":tr.kg>cap?"warn":"ok";const cerrada=S.col.has(tr.t.id);
     return `<div class="panel rcard" data-tid="${esc(tr.t.id)}"><div class="ph"><span class="rsw" style="background:${col}"></span><h2 style="margin:0">${esc(tr.t.nombre)}</h2><span class="note">${esc(tr.t.dep.nombre)}</span>${tr.t.flete?`<span class="chip warn">Flete · solo esta fecha</span>`:""}<span class="sp"></span><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)} kg</span>${colBtn(tr.t.id,tr.st.length)}</div>
      <div class="pb">${tr.t.flete?`<div class="clrow" style="margin-bottom:10px"><label class="tgl">Nombre <input class="inp" data-fl="${esc(tr.t.id)}" data-campo="nombre" value="${esc(tr.t.nombre)}" style="width:140px"></label><label class="tgl">Capacidad <input class="inp num" data-fl="${esc(tr.t.id)}" data-campo="capKg" value="${tr.t.capKg||0}" inputmode="numeric" style="width:80px"> kg</label><label class="tgl">Sale de <select class="inp" data-fl="${esc(tr.t.id)}" data-campo="dep">${(S.log.depositos||[]).map(d=>`<option value="${esc(d.id)}"${d.id===tr.t.dep.id?" selected":""}>${esc(d.nombre)}</option>`).join("")}</select></label><button class="btn sm dng" data-delflete="${esc(tr.t.id)}">Quitar flete</button></div>`:""}<div class="rbar"><span style="width:${Math.min(100,pct)}%;background:${st==="ok"?"var(--verde)":st==="warn"?"var(--amarillo-osc)":"var(--danger)"}"></span></div>
-     <div class="note" style="margin:6px 0 8px">${tr.st.length} paradas · ${nf1.format(tr.caj)} CAJ · ${moneyShort(tr.imp)} · ${kmTxt(tr)}${tr.t.tol?` · tolerancia +${tr.t.tol}%`:""}${tr.st.length?` · sale ${min2hm(tpv.sal)}, vuelve ~<b>${min2hm(tr.h.vuelta)}</b>`:""}${tr.h.nTarde?` · <span class="pasa">${tr.h.nTarde} fuera de horario</span>`:""}</div>
+     <div class="note" style="margin:6px 0 8px">${tr.st.length} paradas · ${nf1.format(tr.caj)} CAJ · ${moneyShort(tr.imp)} · ${kmTxt(tr)}${tr.t.tol?` · tolerancia +${tr.t.tol}%`:""}${tr.st.length?` · sale ${min2hm(tpv.sal)}, vuelve ~<b${tr.h.exceso>0?' class="pasa"':""}>${min2hm(tr.h.vuelta)}</b>${tr.h.vmax!=null?` (límite ${min2hm(tr.h.vmax)})`:""}`:""}${tr.h.nTarde?` · <span class="pasa">${tr.h.nTarde} fuera de horario</span>`:""}</div>
      ${tr.st.length&&cerrada?"":tr.st.length?`<ol class="rstops">${tr.st.map((s,k)=>stopRow(s,k,col,tr.t.id)).join("")}</ol>
      <div class="ract"><button class="btn sm" data-opt="${esc(tr.t.id)}">Optimizar orden</button>${tr.real?"":`<button class="btn sm" data-real="${esc(tr.t.id)}"${con?"":" disabled"}>Km por calles</button>`}<button class="btn sm" data-pdf="${esc(tr.t.id)}">PDF de carga</button><button class="btn sm" data-hr="${esc(tr.t.id)}">Copiar hoja de ruta</button><button class="btn sm" data-hc="${esc(tr.t.id)}">Copiar hoja de carga</button>${gmapsLinks(tr.t.dep,tr.st).map((u,k,a)=>`<a class="btn sm pri" href="${esc(u)}" target="_blank" rel="noopener">Google Maps${a.length>1?" tramo "+(k+1):""}</a>`).join("")}</div>`:`<div class="note">Sin paradas asignadas.</div>`}</div></div>`}).join("");
   const pend=m.pend.length?`<div class="panel rcard" data-tid="none"><div class="ph"><span class="rsw" style="background:#6b7280"></span><h2 style="margin:0">Sin camión</h2><span class="note">${m.pend.length} cliente${m.pend.length>1?"s":""}</span><span class="sp"></span><span class="chip">${nf0.format(m.pend.reduce((a,s)=>a+s.kg,0))} kg</span>${colBtn("none",m.pend.length)}</div>${S.col.has("none")?"":`<div class="pb"><ol class="rstops">${m.pend.map(s=>stopRow(s,null,"#6b7280",null)).join("")}</ol></div>`}</div>`:"";
@@ -2096,6 +2116,8 @@ function renderRuteo(force){
 }
 $("#v-ruteo").addEventListener("click",e=>{const t=e.target;
   if(t.id==="rtSug"){sugerirRutas();return}
+  if(t.closest("#mapFs")){mapaCompleto();return}
+  if(t.closest("[data-sale]"))return;   // el tilde de "sale hoy" se maneja en change
   if(t.id==="rtReal"){kmReales();return}
   if(t.id==="rtAll"){S.rutaSel=null;S.rutaSelInfo="";S.fit=true;if(S.ruta)saveRuta(S.ruta);else renderRuteo(true);return}
   if(t.id==="pickNo"){S.pick=null;renderRuteo(true);return}
@@ -2120,16 +2142,24 @@ $("#v-ruteo").addEventListener("click",e=>{const t=e.target;
   const sg=t.closest("[data-sug]");if(sg){moveStop(sg.dataset.sug,sg.dataset.to,+sg.dataset.pos);toast("Cliente movido");return}
   const hr=t.closest("[data-hr]"),hc=t.closest("[data-hc]");if(hr||hc){const tr=rutaModel().trucks.find(x=>x.t.id===(hr||hc).dataset[hr?"hr":"hc"]);copyText(hr?hojaRuta(tr):hojaCarga(tr),hr?"Hoja de ruta copiada":"Hoja de carga copiada");return}
 });
-$("#v-ruteo").addEventListener("change",e=>{const s=e.target.closest("[data-mv]");if(s){s.blur();moveStop(s.dataset.mv,s.value);return}
+// Camión disponible o no para la fecha: se guarda en la ruta del día; si no sale, sus paradas quedan sin camión.
+function setSale(tid,on){const R=rutaCopy();const f=new Set(R.fuera||[]);if(on)f.delete(tid);else{f.add(tid);for(const k in R.asig)if(R.asig[k]===tid)R.asig[k]="none";delete R.orden[tid];delete R.real[tid]}
+  R.fuera=[...f];saveRuta(R);const t=camionesTodos().find(x=>x.id===tid);toast(on?`${t?t.nombre:"El camión"} vuelve a salir. Tocá Armar rutas sugeridas.`:`${t?t.nombre:"El camión"} no sale hoy. Tocá Armar rutas sugeridas para repartir sus paradas.`)}
+$("#v-ruteo").addEventListener("change",e=>{const sl=e.target.closest("[data-sale]");if(sl){setSale(sl.dataset.sale,sl.checked);return}
+  const s=e.target.closest("[data-mv]");if(s){s.blur();moveStop(s.dataset.mv,s.value);return}
   const f=e.target.closest("[data-fl]");if(f){f.blur();editFlete(f.dataset.fl,f.dataset.campo,f.value)}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.pick){S.pick=null;renderRuteo(true)}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.pick){S.pick=null;renderRuteo(true)}else if(e.key==="Escape"&&document.body.classList.contains("mapfull"))mapaCompleto(false)});
+// Mapa en pantalla completa: el panel del mapa pasa a ocupar toda la ventana (también en el celular).
+function mapaCompleto(on){const w=document.querySelector(".rmapw");if(!w)return;if(on==null)on=!w.classList.contains("full");
+  w.classList.toggle("full",on);document.body.classList.toggle("mapfull",on);const b=$("#mapFs");if(b)b.textContent=on?"✕ Salir de pantalla completa":"⛶ Pantalla completa";
+  setTimeout(()=>{if(map)map.invalidateSize()},60)}
 /* configuración de depósitos y camiones */
 let logDraft=null,logDirty=false;   // logDirty: hay cambios sin guardar; la sincronización no los pisa
 function renderLogCfg(useDraft){
   const el=$("#rtCfg");if(!el)return;if(!useDraft){if(el.contains(document.activeElement)||(logDirty&&logDraft))return;logDraft=JSON.parse(JSON.stringify(S.log))}
   el.innerHTML=`<div class="clrow"><label class="tgl">Interior a más de <input class="inp num" id="lgInt" value="${logDraft.interiorKm||150}" inputmode="numeric"> km</label><label class="tgl">Factor de distancia por calles <input class="inp num" id="lgFac" value="${logDraft.factorKm||1.3}" inputmode="decimal"></label></div>
    ${(logDraft.depositos||[]).map((d,di)=>`<div class="ldep" data-di="${di}"><div class="clrow"><b style="font-size:15px">${esc(d.nombre)}</b><span class="note">${esc(d.dir||"")}</span><label class="tgl">Coordenadas <input class="inp" data-dc value="${d.lat!=null?d.lat+", "+d.lon:""}" style="width:200px"></label></div>
-     <table class="cat"><thead><tr><th>Camión</th><th class="n">Capacidad (kg)</th><th class="n">Tolerancia (%)</th><th></th></tr></thead><tbody>${(d.camiones||[]).map((t,ti)=>`<tr data-ti="${ti}"><td><input data-f="nombre" value="${esc(t.nombre)}"></td><td><input data-f="capKg" value="${t.capKg||""}" inputmode="numeric" style="text-align:right"></td><td><input data-f="tol" value="${t.tol||0}" inputmode="decimal" style="text-align:right"></td><td><button class="btn sm dng" data-delcam>Quitar</button></td></tr>`).join("")}</tbody></table>
+     <table class="cat"><thead><tr><th>Camión</th><th class="n">Capacidad (kg)</th><th class="n">Tolerancia (%)</th><th title="Si queda vacío, vale la hora general">De vuelta antes de</th><th></th></tr></thead><tbody>${(d.camiones||[]).map((t,ti)=>`<tr data-ti="${ti}"><td><input data-f="nombre" value="${esc(t.nombre)}"></td><td><input data-f="capKg" value="${t.capKg||""}" inputmode="numeric" style="text-align:right"></td><td><input data-f="tol" value="${t.tol||0}" inputmode="decimal" style="text-align:right"></td><td><input data-f="vueltaMax" type="time" value="${esc(t.vueltaMax||"")}" title="Vacío = la hora general (${esc(logDraft.vueltaMax===undefined?"13:00":logDraft.vueltaMax||"sin límite")})"></td><td><button class="btn sm dng" data-delcam>Quitar</button></td></tr>`).join("")}</tbody></table>
      <div><button class="btn sm" data-addcam>Agregar camión</button></div></div>`).join("")}
    ${zonasCfgHtml()}
    <div class="clrow" style="margin-top:12px"><span class="sp" style="flex:1"></span><button class="btn pri" id="lgSave">Guardar depósitos y camiones</button></div>`;
@@ -2157,10 +2187,13 @@ function zonasCfgHtml(){
     <div class="clrow" style="margin-top:10px"><b>Horarios</b></div>
     <div class="clrow">
       <label class="tgl">Salida de los camiones <input class="inp" type="time" id="lgSal" value="${esc(d.salida||"06:00")}" style="width:110px"></label>
+      <label class="tgl">De vuelta en el depósito antes de <input class="inp" type="time" id="lgVmax" value="${esc(d.vueltaMax===undefined?"13:00":d.vueltaMax)}" style="width:110px"></label>
+      <label class="tgl"><input type="checkbox" id="lgTodos"${d.usarTodos===false?"":" checked"}> Que salgan todos los camiones disponibles</label>
       <label class="tgl">Por cliente <input class="inp num" id="lgPar" value="${d.minParada>=0?d.minParada:10}" inputmode="decimal"> min</label>
       <label class="tgl">más <input class="inp num" id="lgBlt" value="${d.segBulto>=0?d.segBulto:20}" inputmode="decimal"> seg por bulto (CAJ)</label>
       <label class="tgl">Tolerancia de ventana <input class="inp num" id="lgTol" value="${d.tolVent>=0?d.tolVent:20}" inputmode="numeric"> min</label>
       <label class="tgl">Factor de tránsito × <input class="inp num" id="lgFtr" value="${String(d.factorTr>0?d.factorTr:1.3).replace(".",",")}" inputmode="decimal"></label></div>
+    <div class="note">La hora de vuelta se puede cambiar por camión en su tabla (columna "De vuelta antes de"), por ejemplo 11:00 para el camión de Hurlingham que hace el transbordo. Si un camión no puede cumplir, se marca en rojo.</div>
     <div class="note">Factor de tránsito: los tiempos del mapa son sin tránsito y se multiplican por este número. Para ajustarlo, compará la hora real de vuelta de un camión con la estimada: si tardó un 20% más de lo previsto, subilo un 20% (por ejemplo de 1,3 a 1,55). Si volvió antes, bajalo.</div></div>
    <details class="ldep" id="lgZonas"${S.zOpen?" open":""}><summary><b style="font-size:15px">Zonas por depósito</b> <span class="note">· ${ciu.length} localidades · ${asig} con depósito fijo</span></summary>
     <div class="clrow" style="margin:8px 0"><input type="search" class="inp" id="lgZq" placeholder="Buscar localidad" value="${esc(S.zq)}" style="width:200px"><button class="btn sm" id="lgZprop">Proponer por tiempo de manejo</button><span class="note">Completa las que están en "Cualquiera": el depósito más rápido si gana por 5 min o más, y Capital desde Hurlingham, Pilar desde Escobar.</span></div>
@@ -2193,13 +2226,15 @@ $("#rtCfg").addEventListener("change",e=>{const t=e.target;
   if(t.dataset.zc!=null){logDraft.zonas=logDraft.zonas||{};if(t.value)logDraft.zonas[t.dataset.zc]=t.value;else delete logDraft.zonas[t.dataset.zc];return}
   if(t.id==="lgMed")logDraft.medida=t.value;if(t.id==="lgZm")logDraft.zonaModo=t.value;
   if(t.id==="lgSal"&&hm2min(t.value)!=null)logDraft.salida=t.value;
+  if(t.id==="lgVmax")logDraft.vueltaMax=hm2min(t.value)!=null?t.value:"";
+  if(t.id==="lgTodos")logDraft.usarTodos=t.checked;
   const num={lgPar:"minParada",lgBlt:"segBulto",lgTol:"tolVent",lgFtr:"factorTr"}[t.id];if(num){const v=parseNum(t.value);if(v>=0)logDraft[num]=num==="factorTr"?Math.max(0.5,Math.min(3,v||1.3)):v}});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;if(t.id!=="lgZq")return;S.zq=t.value;const q=normCiu(t.value);
   document.querySelectorAll("#lgZonas tr[data-zk]").forEach(tr=>{tr.hidden=!!q&&!tr.dataset.zk.includes(q)})});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;const dv=t.closest("[data-di]");
   if(t.id==="lgInt")logDraft.interiorKm=parseNum(t.value);if(t.id==="lgFac")logDraft.factorKm=parseNum(t.value);if(!dv)return;const d=logDraft.depositos[+dv.dataset.di];
   if(t.hasAttribute("data-dc")){const v=parseCoords(t.value);if(v){d.lat=v.lat;d.lon=v.lon}}
-  const tr=t.closest("[data-ti]");if(tr){const c=d.camiones[+tr.dataset.ti];const f=t.dataset.f;c[f]=f==="nombre"?t.value:parseNum(t.value)}});
+  const tr=t.closest("[data-ti]");if(tr){const c=d.camiones[+tr.dataset.ti];const f=t.dataset.f;c[f]=f==="nombre"||f==="vueltaMax"?t.value:parseNum(t.value)}});
 $("#rtCfg").addEventListener("click",e=>{const dv=e.target.closest("[data-di]");
   if(e.target.closest("[data-addcam]")){const d=logDraft.depositos[+dv.dataset.di];d.camiones=d.camiones||[];d.camiones.push({id:d.id+"-"+Date.now().toString(36),nombre:`Camión ${d.camiones.length+1} ${d.nombre}`,capKg:0,tol:5});renderLogCfg(true);return}
   if(e.target.closest("[data-delcam]")){const d=logDraft.depositos[+dv.dataset.di];d.camiones.splice(+e.target.closest("[data-ti]").dataset.ti,1);renderLogCfg(true);return}
