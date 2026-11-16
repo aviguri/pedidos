@@ -1118,7 +1118,8 @@ function orderText(o){
   const s=orderStats(o);const L=[`*PEDIDO AVIGURI* · Entrega ${dLong(S.fecha)}`,`*${nomL(o)}* (#${o.cli})`];
   const ad=[o.dir,o.ciu].filter(Boolean).join(" - ");if(ad)L.push(ad);L.push("");
   for(const l of s.lines)L.push(`• ${CO(l.p)} ${l.p.unidad==="kg"?"":"("+l.p.nombre+") "}× ${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"} — ${money(l.pr)}`);
-  L.push("",`Total: ${nf1.format(s.cajas)} CAJ · ${money(s.imp)}`);if(o.obs)L.push("Obs: "+o.obs);return L.join("\n");
+  // Solo el importe (Gere, 16/11): el trozado se vende de a 10 kg y sumar CAJ confunde (10 kg de dos trozados figuraba como 1 CAJ).
+  L.push("",`Total: ${money(s.imp)}`);if(o.obs)L.push("Obs: "+o.obs);return L.join("\n");
 }
 function dayText(){
   const os=validOrders();const L=[`*PEDIDOS AVIGURI* · Entrega ${dLong(S.fecha)}`,`${os.length} clientes`,""];
