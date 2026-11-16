@@ -1686,7 +1686,12 @@ function horario(dep,arr,p){p=p||TP();let t=p.sal,prev=dep;const paradas=[];let 
 }
 // Costo de horarios para el armado: la espera cuenta como tiempo, la espera de más se evita; llegar tarde a un cliente
 // y volver después del límite del camión pesan mucho (20 por minuto).
-function ventCost(dep,arr){if(!arr.length||(!arr.some(s=>s.vent)&&!(dep&&dep._vmax!=null)))return 0;const h=horario(dep,arr);return h.espera+3*h.extra+20*h.tarde+20*h.exceso}
+/* Reparto del trabajo (16/11): con solo "menos tiempo total" un camión puede quedar con 1 parada y otro hacer una vuelta larga.
+   Se suma α × (horas de trabajo del camión)² → las horas de un camión cargado cuestan más que las de uno liviano. 0 = menos tiempo total. */
+const REPARTO={total:0,equilibrado:0.004,parejo:0.012};
+const alfaRep=()=>{const v=S.log&&S.log.reparto;return REPARTO[v==null?"equilibrado":v]||0};
+function ventCost(dep,arr){if(!arr.length)return 0;const a=alfaRep();if(!a&&!arr.some(s=>s.vent)&&!(dep&&dep._vmax!=null))return 0;
+  const h=horario(dep,arr);const dur=h.vuelta-TP().sal;return h.espera+3*h.extra+20*h.tarde+20*h.exceso+a*dur*dur}
 // Que salgan todos los camiones disponibles (Gere, 14/11): un camión vacío cuesta como 5 horas, así el armado lo usa siempre que pueda.
 const PEN_VACIO=300;const penVacio=()=>S.log&&S.log.usarTodos===false?0:PEN_VACIO;
 let VW=false;   // true cuando alguna parada del armado tiene ventana: los movimientos se evalúan con el recorrido completo
@@ -1849,7 +1854,7 @@ async function sugerirRutas(){
     setSync(true,"Pidiendo distancias por calle…");
     const porCalle=await cargarMatriz([...new Map(trucks.map(t=>[t.dep.id,t.dep])).values(),...ok]);
     setSync(true,"Armando rutas…");await new Promise(r=>setTimeout(r,30));
-    VW=ok.some(s=>s.vent)||trucks.some(t=>t.dep._vmax!=null);
+    VW=ok.some(s=>s.vent)||trucks.some(t=>t.dep._vmax!=null)||alfaRep()>0;
     let x=12345;const rnd=()=>(x=(x*16807)%2147483647)/2147483647;
     let best=null;
     for(const modo of ["lejos","barato","azar","azar","azar","azar","azar"]){const sol=busquedaLocal(construir(ok,trucks,modo,rnd));if(!best||mejorQue(sol,best))best=sol}
@@ -1870,7 +1875,7 @@ async function sugerirRutas(){
 const firma=(t,st)=>t.id+"|"+[t.dep,...st].map(p=>(+p.lat).toFixed(5)+","+(+p.lon).toFixed(5)).join(";");
 function rutaModel(){
   const stops=rutaStops();const cls=classify(stops);const R=S.ruta||{asig:{},orden:{}};const byId=new Map(cls.ok.map(s=>[s.id,s]));
-  const tp=TP();VW=cls.ok.some(s=>s.vent)||camiones().some(t=>t.dep._vmax!=null);
+  const tp=TP();VW=cls.ok.some(s=>s.vent)||camiones().some(t=>t.dep._vmax!=null)||alfaRep()>0;
   const trucks=camiones().map(t=>{const ids=((R.orden||{})[t.id]||[]).filter(id=>byId.has(id)&&R.asig[id]===t.id);
     for(const id in R.asig)if(R.asig[id]===t.id&&byId.has(id)&&!ids.includes(id))ids.push(id);
     const st=ids.map(id=>byId.get(id));const kg=st.reduce((a,s)=>a+s.kg,0);
@@ -2191,10 +2196,12 @@ function zonasCfgHtml(){
       <label class="tgl">Salida de los camiones <input class="inp" type="time" id="lgSal" value="${esc(d.salida||"06:00")}" style="width:110px"></label>
       <label class="tgl">De vuelta en el depósito antes de <input class="inp" type="time" id="lgVmax" value="${esc(d.vueltaMax===undefined?"13:00":d.vueltaMax)}" style="width:110px"></label>
       <label class="tgl"><input type="checkbox" id="lgTodos"${d.usarTodos===false?"":" checked"}> Que salgan todos los camiones disponibles</label>
+      <label class="tgl">Reparto del trabajo <select class="inp" id="lgRep" style="width:auto">${[["total","Menos tiempo total"],["equilibrado","Equilibrado (recomendado)"],["parejo","Parejo"]].map(([v,l])=>`<option value="${v}"${(d.reparto||"equilibrado")===v?" selected":""}>${l}</option>`).join("")}</select></label>
       <label class="tgl">Por cliente <input class="inp num" id="lgPar" value="${d.minParada>=0?d.minParada:10}" inputmode="decimal"> min</label>
       <label class="tgl">más <input class="inp num" id="lgBlt" value="${d.segBulto>=0?d.segBulto:20}" inputmode="decimal"> seg por bulto (CAJ)</label>
       <label class="tgl">Tolerancia de ventana <input class="inp num" id="lgTol" value="${d.tolVent>=0?d.tolVent:20}" inputmode="numeric"> min</label>
       <label class="tgl">Factor de tránsito × <input class="inp num" id="lgFtr" value="${String(d.factorTr>0?d.factorTr:1.3).replace(".",",")}" inputmode="decimal"></label></div>
+    <div class="note">Reparto del trabajo: "Menos tiempo total" suma la menor cantidad de horas entre todos, aunque un camión haga una vuelta larga y otro casi nada. "Equilibrado" reparte las horas entre los camiones a cambio de unos minutos más en total. "Parejo" los iguala más todavía. No busca que vayan igual de cargados en kg.</div>
     <div class="note">La hora de vuelta se puede cambiar por camión en su tabla (columna "De vuelta antes de"), por ejemplo 11:00 para el camión de Hurlingham que hace el transbordo. Si un camión no puede cumplir, se marca en rojo.</div>
     <div class="note">Factor de tránsito: los tiempos del mapa son sin tránsito y se multiplican por este número. Para ajustarlo, compará la hora real de vuelta de un camión con la estimada: si tardó un 20% más de lo previsto, subilo un 20% (por ejemplo de 1,3 a 1,55). Si volvió antes, bajalo.</div></div>
    <details class="ldep" id="lgZonas"${S.zOpen?" open":""}><summary><b style="font-size:15px">Zonas por depósito</b> <span class="note">· ${ciu.length} localidades · ${asig} con depósito fijo</span></summary>
@@ -2230,6 +2237,7 @@ $("#rtCfg").addEventListener("change",e=>{const t=e.target;
   if(t.id==="lgSal"&&hm2min(t.value)!=null)logDraft.salida=t.value;
   if(t.id==="lgVmax")logDraft.vueltaMax=hm2min(t.value)!=null?t.value:"";
   if(t.id==="lgTodos")logDraft.usarTodos=t.checked;
+  if(t.id==="lgRep")logDraft.reparto=t.value;
   const num={lgPar:"minParada",lgBlt:"segBulto",lgTol:"tolVent",lgFtr:"factorTr"}[t.id];if(num){const v=parseNum(t.value);if(v>=0)logDraft[num]=num==="factorTr"?Math.max(0.5,Math.min(3,v||1.3)):v}});
 $("#rtCfg").addEventListener("input",e=>{const t=e.target;if(t.id!=="lgZq")return;S.zq=t.value;const q=normCiu(t.value);
   document.querySelectorAll("#lgZonas tr[data-zk]").forEach(tr=>{tr.hidden=!!q&&!tr.dataset.zk.includes(q)})});
