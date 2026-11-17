@@ -173,6 +173,7 @@ th{font-weight:800}
 <ol>
   <li><b>Entregar todo lo que entra:</b> la capacidad de cada camión más su tolerancia es un límite. Si no entra todo, quedan afuera los clientes que más tiempo agregan.</li>
   <li><b>Que salgan todos los camiones disponibles.</b> No hace falta que vayan parejos: un camión puede salir más cargado que otro si va a una zona en particular.</li>
+  <li><b>Rutas compactas:</b> cada camión trabaja una zona, sin juntar zonas separadas en el mismo recorrido (por ejemplo, Trujui y Capital).</li>
   <li><b>Repartir el trabajo</b> según la opción elegida: <i>Menos tiempo total</i> (la menor suma de horas, aunque un camión haga una vuelta larga y otro casi nada), <i>Equilibrado</i> (recomendado: reparte las horas a cambio de unos minutos más) o <i>Parejo</i>.</li>
   <li><b>Que cada camión vuelva a tiempo:</b> de vuelta en el depósito antes de las 13:00, o antes de su propia hora (por ejemplo el camión de Hurlingham que tiene que estar a las 11:00 para el transbordo).</li>
   <li><b>Cumplir los horarios de entrega</b> de los clientes que tienen ventana horaria (ver abajo).</li>
@@ -255,6 +256,7 @@ th{font-weight:800}
   <tr><td>Salida de los camiones</td><td>06:00</td><td>Hora de salida de todos los camiones.</td></tr>
   <tr><td>De vuelta en el depósito antes de</td><td>13:00</td><td>Hora límite de vuelta de todos los camiones (salvo los que tienen su propia hora).</td></tr>
   <tr><td>Que salgan todos los camiones disponibles</td><td>Sí</td><td>El armado usa todos los camiones que salen ese día.</td></tr>
+  <tr><td>Rutas compactas</td><td>Sí, cada camión en una zona</td><td>Evita que un camión junte zonas separadas. "Un poco" lo hace más suave; "No" busca solo el menor tiempo.</td></tr>
   <tr><td>Reparto del trabajo</td><td>Equilibrado</td><td>Cómo se reparten las horas entre camiones: menos tiempo total, equilibrado o parejo. No busca igualar los kg.</td></tr>
   <tr><td>Por cliente</td><td>10 min</td><td>Tiempo fijo de cada entrega.</td></tr>
   <tr><td>Por bulto</td><td>20 seg por CAJ</td><td>Se suma al tiempo de cada entrega según su cantidad.</td></tr>
@@ -344,6 +346,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">17/11/2026</span> · Rutas compactas: cada camión trabaja una zona (por ejemplo, el camión de Capital ya no pasa antes por Trujui).</li>
   <li><span class="fecha">17/11/2026</span> · PDF de carga con el QR del link del chofer en cada camión (se crea el link si no existía).</li>
   <li><span class="fecha">17/11/2026</span> · Link para el chofer: hoja de ruta en el celular con Google Maps por cliente, Entregado / No entregado con motivo, y el avance en vivo en el Ruteo (chip por camión, marcas por cliente y columna Chofer). Requiere Code.gs versión 8. Se sacaron los botones de Google Maps por tramos: la navegación va por el link del chofer (la hoja de ruta copiada trae ese link si ya está creado).</li>
   <li><span class="fecha">16/11/2026</span> · Reparto del trabajo entre camiones (Menos tiempo total / Equilibrado / Parejo), para que no quede un camión con una sola parada mientras otro hace una vuelta larga.</li>
