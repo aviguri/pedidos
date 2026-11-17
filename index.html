@@ -2254,9 +2254,14 @@ S.zOpen=false;S.zTiempos=null;S.zq="";
 const ZONA_REGLAS=[[/^CAPITAL FEDERAL$/,/hurlingham/i],[/^(PILAR|DEL VISO|TORTUGUITAS|MANUEL ALBERTI|PRESIDENTE DERQUI|PTE DERQUI|VILLA ROSA|FATIMA|MANZANARES|VILLA ASTOLFI|LA LONJA|ZELAYA)$/,/escobar/i]];
 function zonaCiudades(){
   const deps=(S.log.depositos||[]).filter(d=>d.lat!=null);const lim=S.log.interiorKm||150;const m=new Map();
-  for(const c of S.clientes||[]){const k=normCiu(c.ciu);if(!k)continue;const g=geoOf(c);if(!g||g.lat==null||!isFinite(g.lat))continue;
-    if(deps.length&&Math.min(...deps.map(d=>hav(g,d)))>lim)continue;
-    const x=m.get(k)||{k,n:0,lat:0,lon:0};x.n++;x.lat+=+g.lat;x.lon+=+g.lon;m.set(k,x)}
+  // Un lugar de entrega cuenta para su localidad si está ubicado y no es del interior: clientes (dirección principal) y, desde el 18/11,
+  // también las sucursales (ej. Boulogne solo existía como sucursal y no aparecía en la tabla).
+  const sumar=(ciu,g)=>{const k=normCiu(ciu);if(!k||!g||g.lat==null||!isFinite(g.lat))return;if(deps.length&&Math.min(...deps.map(d=>hav(g,d)))>lim)return;
+    const x=m.get(k)||{k,n:0,lat:0,lon:0};x.n++;x.lat+=+g.lat;x.lon+=+g.lon;m.set(k,x)};
+  for(const c of S.clientes||[])sumar(c.ciu,geoOf(c));
+  for(const [cli,list] of S.suc||[])for(const s of list){if(!s.activa)continue;const g=S.geo&&S.geo[lugarId(cli,s.n)];if(g)sumar(s.ciu,{lat:+g[0],lon:+g[1]})}
+  // Localidades de los pedidos del día que todavía no tienen ubicación: aparecen igual (sin minutos) para poder asignarles depósito.
+  for(const o of liveOrders()){if(o.anulado)continue;const k=normCiu(o.ciu);if(k&&!m.has(k))m.set(k,{k,n:0,lat:0,lon:0})}
   for(const k of Object.keys((logDraft&&logDraft.zonas)||{}))if(!m.has(k))m.set(k,{k,n:0,lat:0,lon:0});
   return [...m.values()].map(x=>({...x,lat:x.n?x.lat/x.n:null,lon:x.n?x.lon/x.n:null})).sort((a,b)=>b.n-a.n||a.k.localeCompare(b.k));
 }
@@ -2285,7 +2290,7 @@ function zonasCfgHtml(){
     <div class="note">Factor de tránsito: los tiempos del mapa son sin tránsito y se multiplican por este número. Para ajustarlo, compará la hora real de vuelta de un camión con la estimada: si tardó un 20% más de lo previsto, subilo un 20% (por ejemplo de 1,3 a 1,55). Si volvió antes, bajalo.</div></div>
    <details class="ldep" id="lgZonas"${S.zOpen?" open":""}><summary><b style="font-size:15px">Zonas por depósito</b> <span class="note">· ${ciu.length} localidades · ${asig} con depósito fijo</span></summary>
     <div class="clrow" style="margin:8px 0"><input type="search" class="inp" id="lgZq" placeholder="Buscar localidad" value="${esc(S.zq)}" style="width:200px"><button class="btn sm" id="lgZprop">Proponer por tiempo de manejo</button><span class="note">Completa las que están en "Cualquiera": el depósito más rápido si gana por 5 min o más, y Capital desde Hurlingham, Pilar desde Escobar.</span></div>
-    <table class="cat zon"><thead><tr><th>Localidad</th><th class="n">Clientes</th>${deps.map(p=>`<th class="n">Min. desde ${esc(p.nombre)}</th>`).join("")}<th>Sale de</th></tr></thead><tbody>
+    <table class="cat zon"><thead><tr><th>Localidad</th><th class="n" title="Clientes y sucursales ubicados en esa localidad">Lugares</th>${deps.map(p=>`<th class="n">Min. desde ${esc(p.nombre)}</th>`).join("")}<th>Sale de</th></tr></thead><tbody>
     ${ciu.map(x=>`<tr data-zk="${esc(x.k)}"${S.zq&&!x.k.includes(normCiu(S.zq))?" hidden":""}><td>${esc(x.k)}</td><td class="n">${x.n||"—"}</td>${deps.map(p=>{const v=tm[x.k]&&tm[x.k][p.id];return `<td class="n">${v!=null?nf0.format(v):"—"}</td>`}).join("")}<td>${sel(x.k)}</td></tr>`).join("")}</tbody></table></details>`;
 }
 async function proponerZonas(){

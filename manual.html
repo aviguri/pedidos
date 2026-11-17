@@ -40,7 +40,7 @@ th{font-weight:800}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 17/11/2026</p></div></header>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 18/11/2026</p></div></header>
 <div class="wrap">
 <nav>
   <b>Contenido</b>
@@ -266,7 +266,7 @@ th{font-weight:800}
 <div class="tip"><b>Cómo ajustar el factor de tránsito:</b> anotá a qué hora volvió realmente un camión y comparala con la hora de vuelta estimada. Si tardó un 20% más de lo previsto, subí el factor un 20% (de 1,3 a 1,55). Si volvió antes, bajalo. Conviene mirarlo con dos o tres días distintos.</div>
 <h3>Zonas por depósito</h3>
 <ul>
-  <li>Una tabla con cada localidad donde hay clientes, los minutos de manejo desde cada depósito y de qué depósito sale.</li>
+  <li>Una tabla con cada localidad donde hay clientes o sucursales ubicados (y las de los pedidos del día, aunque todavía no estén ubicados), los minutos de manejo desde cada depósito y de qué depósito sale. Las sucursales usan la zona de su propia localidad.</li>
   <li><b>Proponer por tiempo de manejo</b> completa las que están en "Cualquiera": el depósito más rápido si gana por 5 minutos o más. Además aplica las decisiones tomadas: <b>Capital desde Hurlingham</b> y <b>Pilar</b> (Del Viso, Tortuguitas, Manuel Alberti, Zelaya…) <b>desde Escobar</b>.</li>
   <li>Las que tienen tiempos parejos quedan en "Cualquiera" y el armado decide cada día.</li>
   <li>Cada localidad se puede cambiar a mano.</li>
@@ -346,6 +346,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">18/11/2026</span> · Zonas por depósito: la tabla suma las localidades de las sucursales (por ejemplo Boulogne) y las de los pedidos del día.</li>
   <li><span class="fecha">17/11/2026</span> · Rutas compactas: cada camión trabaja una zona (por ejemplo, el camión de Capital ya no pasa antes por Trujui).</li>
   <li><span class="fecha">17/11/2026</span> · PDF de carga con el QR del link del chofer en cada camión (se crea el link si no existía).</li>
   <li><span class="fecha">17/11/2026</span> · Link para el chofer: hoja de ruta en el celular con Google Maps por cliente, Entregado / No entregado con motivo, y el avance en vivo en el Ruteo (chip por camión, marcas por cliente y columna Chofer). Requiere Code.gs versión 8. Se sacaron los botones de Google Maps por tramos: la navegación va por el link del chofer (la hoja de ruta copiada trae ese link si ya está creado).</li>
