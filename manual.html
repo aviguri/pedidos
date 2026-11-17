@@ -319,7 +319,8 @@ th{font-weight:800}
 <h2>10. Administración</h2>
 <ul>
   <li><b>Dónde están los datos:</b> en una planilla de Google privada. La página se conecta con un puente de Apps Script (<code>Code.gs</code>).</li>
-  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>8</b> (la 8 agrega los links para el chofer y la hoja <code>Repartos</code>).</li>
+  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>9</b> (la 8 agregó los links para el chofer y la hoja <code>Repartos</code>; la 9, el aviso de cambios cruzados en rutas y pedidos y lecturas más rápidas).</li>
+  <li><b>Pruebas automáticas:</b> antes de cada publicación se corre un conjunto de pruebas que usa datos inventados y no toca la planilla.</li>
   <li><b>Conexión:</b> solo la ven los administradores. Desde la pantalla de ingreso, "Acceso técnico (administrador)" permite entrar con la clave maestra en caso de emergencia.</li>
   <li><b>Volver atrás:</b> la página tiene todas sus versiones guardadas y se puede volver a cualquiera en minutos. Code.gs: elegir una versión anterior en Administrar implementaciones. Datos: Archivo › Historial de versiones de la planilla.</li>
 </ul>
@@ -346,6 +347,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">18/11/2026</span> · Revisión completa y correcciones: la hoja del chofer siempre lleva todas las paradas de su camión; las marcas del chofer llegan en orden; si dos personas cambian la misma ruta o el mismo pedido, la app avisa en vez de pisar; respuestas más rápidas de la planilla. Requiere Code.gs versión 9.</li>
   <li><span class="fecha">18/11/2026</span> · Rutas compactas más firmes: un camión ya no junta Pilar con la zona norte aunque los otros vayan cargados.</li>
   <li><span class="fecha">18/11/2026</span> · Zonas por depósito: la tabla suma las localidades de las sucursales (por ejemplo Boulogne) y las de los pedidos del día.</li>
   <li><span class="fecha">17/11/2026</span> · Rutas compactas: cada camión trabaja una zona (por ejemplo, el camión de Capital ya no pasa antes por Trujui).</li>

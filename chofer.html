@@ -108,10 +108,18 @@ async function cargar(silencioso){
   try{const j=await call("reparto");R.datos=j.datos;R.estado=j.estado||{};R.nombre=j.nombre;R.fecha=j.fecha;R.error="";if(!R.abierto)render()}   // no pisa el motivo que se está escribiendo
   catch(e){if(e.codigo==="link"){R.error=e.message;R.datos=null}else if(!silencioso&&!R.datos)R.error="No se pudo cargar el reparto. Revisá la señal y tocá recargar.";render()}
 }
+// Una sola vuelta de envío a la vez y en orden: si no, dos toques seguidos mandaban la misma marca dos veces y podían llegar
+// desordenadas (por ejemplo un "Entregado" después de su "Deshacer"). Revisión 18/11.
+let enviando=false;
+const quitar=m=>{cola=cola.filter(x=>x!==m);ls.set(QK,cola)};
 async function enviarCola(){
-  while(cola.length){const m=cola[0];
-    try{const j=await call("marcar",{id:m.id,e:m.e,nota:m.nota||"",hora:m.hora});R.estado=j.estado||R.estado;cola.shift();ls.set(QK,cola)}
-    catch(e){if(e.codigo==="link"){cola=[];ls.set(QK,cola);R.error=e.message}break}}
+  if(enviando)return;enviando=true;
+  try{while(cola.length){const m=cola[0];
+    try{const j=await call("marcar",{id:m.id,e:m.e,nota:m.nota||"",hora:m.hora});R.estado=j.estado||R.estado;quitar(m)}
+    catch(e){if(e.codigo==="link"){cola=[];ls.set(QK,cola);R.error=e.message;break}
+      if(e.codigo==="parada"){quitar(m);R.error=e.message;continue}   // esa parada ya no es de este camión: se descarta
+      break}}}
+  finally{enviando=false}
   render();
 }
 function marcar(id,e,nota){cola=cola.filter(m=>m.id!==id);cola.push({id,e,nota:nota||"",hora:Date.now()});ls.set(QK,cola);R.abierto=null;render();enviarCola()}
