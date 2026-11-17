@@ -224,6 +224,7 @@ th{font-weight:800}
 <h3>PDF de carga</h3>
 <ul>
   <li>Una hoja por camión: encabezado con depósito, fecha, entregas, CAJ, kg, km, importe y horarios.</li>
+  <li><b>QR del reparto</b> arriba a la derecha: el chofer lo escanea con la cámara del celular y abre su link de reparto (el mismo de "📱 Link para el chofer"). Si el camión todavía no tenía link, se crea solo al generar el PDF.</li>
   <li>Mercadería total por producto con la columna <b>Cargado</b> para tildar. Se carga al revés: la última entrega va al fondo.</li>
   <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma.</li>
 </ul>
@@ -343,6 +344,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">17/11/2026</span> · PDF de carga con el QR del link del chofer en cada camión (se crea el link si no existía).</li>
   <li><span class="fecha">17/11/2026</span> · Link para el chofer: hoja de ruta en el celular con Google Maps por cliente, Entregado / No entregado con motivo, y el avance en vivo en el Ruteo (chip por camión, marcas por cliente y columna Chofer). Requiere Code.gs versión 8. Se sacaron los botones de Google Maps por tramos: la navegación va por el link del chofer (la hoja de ruta copiada trae ese link si ya está creado).</li>
   <li><span class="fecha">16/11/2026</span> · Reparto del trabajo entre camiones (Menos tiempo total / Equilibrado / Parejo), para que no quede un camión con una sola parada mientras otro hace una vuelta larga.</li>
   <li><span class="fecha">16/11/2026</span> · Copiar para WhatsApp: el total muestra solo el importe (sin CAJ), porque el trozado se vende de a 10 kg y la suma en CAJ confundía. El botón de pantalla completa ya no tapa el encabezado al hacer scroll, y en pantallas anchas el mapa vuelve a quedar fijo mientras se recorren las tarjetas.</li>

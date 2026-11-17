@@ -1938,7 +1938,9 @@ function hojaCarga(tr){const m=new Map();for(const s of tr.st)for(const l of ord
 let pdfLibs=null;
 function loadPdfLibs(){
   const add=src=>new Promise((ok,ko)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>ko(new Error("No se pudo cargar el generador de PDF. Revisá internet."));document.head.appendChild(s)});
-  if(!pdfLibs)pdfLibs=add("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(()=>add("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js")).catch(e=>{pdfLibs=null;throw e});
+  if(!pdfLibs)pdfLibs=add("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(()=>add("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"))
+    .then(()=>add("https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js").catch(()=>null))   // QR del link del chofer (17/11); sin él el PDF sale igual
+    .catch(e=>{pdfLibs=null;throw e});
   return pdfLibs;
 }
 // Guardar con la ventana "Guardar como" de Chrome (permite elegir carpeta); si no está disponible, descarga normal.
@@ -1952,6 +1954,9 @@ async function saveBlob(name,blob,tipo){
 async function pdfCarga(trs,nombre){
   trs=trs.filter(tr=>tr.st.length);if(!trs.length){toast("No hay camiones con paradas");return}
   try{await loadPdfLibs()}catch(e){toast(e.message);return}
+  // QR (17/11): cada camión lleva el QR de su link de reparto; si todavía no tiene link, se crea (el mismo de "📱 Link para el chofer").
+  const qrOk=typeof window.qrcode==="function"&&S.db&&!(S.ver&&S.ver<8);let sinLink=0;
+  if(qrOk)for(const tr of trs){if(!repDe(tr.t.id)){toast(`Creando el link de ${tr.t.nombre}…`);if(!await guardarReparto(tr,false,true))sinLink++}}
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const W=doc.internal.pageSize.getWidth();
   const verde=[2,105,55],gris=[90,90,90];const fmt1=v=>nf1.format(v),fmt0=v=>nf0.format(v);
   trs.forEach((tr,ti)=>{
@@ -1963,7 +1968,13 @@ async function pdfCarga(trs,nombre){
     doc.text("GRUPO CTS · AVIGURI",W-12,10,{align:"right"});
     doc.setTextColor(0);doc.setFontSize(10);
     const cap=tr.t.capKg||0;
-    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(tr.imp)} · sale ${min2hm(TP().sal)}, vuelve ~${min2hm(tr.h.vuelta)}`,12,29);
+    const rep=qrOk&&repDe(tr.t.id);const QR=34;   // lado del QR en mm (arriba a la derecha, al lado de la mercadería)
+    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(tr.imp)} · sale ${min2hm(TP().sal)}, vuelve ~${min2hm(tr.h.vuelta)}`,12,29,{maxWidth:W-24});
+    let qrFin=0;
+    if(rep){const q=window.qrcode(0,"M");q.addData(repUrl(rep.token));q.make();const n=q.getModuleCount(),x0=W-12-QR,y0=34,c=QR/n;
+      doc.setDrawColor(...verde);doc.setLineWidth(.4);doc.rect(x0-2,y0-2,QR+4,QR+13);doc.setFillColor(0,0,0);
+      for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(q.isDark(r,k))doc.rect(x0+k*c,y0+r*c,c+.02,c+.02,"F");   // módulos como rectángulos: nítido a cualquier tamaño
+      doc.setFontSize(8);doc.setTextColor(...gris);doc.text(["Escaneá con el celular:","reparto y Google Maps"],x0+QR/2,y0+QR+4,{align:"center"});doc.setTextColor(0);doc.setFontSize(10);qrFin=y0+QR+12}
     // Mercadería total
     const m=new Map();for(const s of tr.st)for(const l of orderStats(s.o).lines){const x=m.get(l.p.id)||{p:l.p,q:0,c:0,kg:0};x.q+=l.q;x.c+=cajasEq(l.p,l.q);x.kg+=pesoKg(l.p,l.q);m.set(l.p.id,x)}
     const merc=[...m.values()].sort((a,b)=>(a.p.orden||0)-(b.p.orden||0));
@@ -1971,8 +1982,8 @@ async function pdfCarga(trs,nombre){
       body:merc.map(x=>[CO(x.p),x.p.nombre,`${fmt1(x.q)} ${x.p.unidad==="kg"?"kg":"CAJ"}`,fmt1(x.c),fmt0(x.kg),""]),
       foot:[["","TOTAL","",fmt1(tr.caj),fmt0(tr.kg),""]],theme:"grid",styles:{fontSize:9.5,cellPadding:1.8},
       headStyles:{fillColor:verde},footStyles:{fillColor:[240,244,241],textColor:0,fontStyle:"bold"},
-      columnStyles:{0:{fontStyle:"bold",cellWidth:28},2:{halign:"right",cellWidth:26},3:{halign:"right",cellWidth:16},4:{halign:"right",cellWidth:18},5:{cellWidth:18}},margin:{left:12,right:12}});
-    let y=doc.lastAutoTable.finalY+5;
+      columnStyles:{0:{fontStyle:"bold",cellWidth:28},2:{halign:"right",cellWidth:26},3:{halign:"right",cellWidth:16},4:{halign:"right",cellWidth:18},5:{cellWidth:18}},margin:{left:12,right:rep?12+QR+6:12}});
+    let y=Math.max(doc.lastAutoTable.finalY,qrFin)+5;
     doc.setFontSize(9);doc.setTextColor(...gris);doc.text("Cargar en orden inverso: la última entrega va primero (al fondo).",12,y);doc.setTextColor(0);
     // Entregas en orden
     doc.autoTable({startY:y+3,head:[["#","Cliente y dirección","Mercadería","CAJ","Importe","Recibió (firma y aclaración)"]],
@@ -1987,7 +1998,8 @@ async function pdfCarga(trs,nombre){
   // Pie en todas las páginas
   const n=doc.internal.getNumberOfPages();const ahora=new Date().toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
   for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(...gris);doc.text(`Generado ${ahora}${S.uid?" por "+S.uid:""}`,12,290);doc.text(`Página ${i} de ${n}`,W-12,290,{align:"right"})}
-  const ok=await saveBlob(nombre,doc.output("blob"),{desc:"PDF",ext:".pdf"});if(ok)toast("PDF generado · "+nombre);
+  const ok=await saveBlob(nombre,doc.output("blob"),{desc:"PDF",ext:".pdf"});if(ok)toast("PDF generado · "+nombre+(sinLink?` · ${sinLink} camión${sinLink>1?"es":""} sin QR (no se pudo crear el link)`:""));
+  renderRuteo(true);
 }
 
 /* ubicaciones compartidas por Ruteo y Ubicaciones */
