@@ -1746,7 +1746,7 @@ const tourMin=(dep,arr)=>tourLen(dep,arr,T);
 // Lo que minimiza el armado para un camión: recorrido en la medida elegida + penalidades de zona.
 /* Rutas compactas (17/11): penaliza que un camión junte zonas separadas (ej. Trujui + Capital). Suma β por km de cada parada al centro de su
    recorrido. Es lo que en otros sistemas se llama "clustering" o "territorios": cada camión trabaja una zona. */
-const COMPACTO={no:0,normal:1.5,fuerte:3};
+const COMPACTO={no:0,normal:3,fuerte:8};   // 18/11: fuerte 3 → 8 (con 84 pedidos el Accelo volvía a juntar Pilar con la zona norte)
 const betaComp=()=>{const v=S.log&&S.log.compacto;return COMPACTO[v==null?"fuerte":v]||0};
 function compCost(arr){const b=betaComp();if(!b||arr.length<2)return 0;let la=0,lo=0;for(const s of arr){la+=+s.lat;lo+=+s.lon}const c={lat:la/arr.length,lon:lo/arr.length};
   let d=0;for(const s of arr)d+=hav(s,c);return b*d}
