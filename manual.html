@@ -40,7 +40,7 @@ th{font-weight:800}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 16/11/2026</p></div></header>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 17/11/2026</p></div></header>
 <div class="wrap">
 <nav>
   <b>Contenido</b>
@@ -201,6 +201,18 @@ th{font-weight:800}
   <li><b>PDF de carga</b>, <b>Copiar hoja de ruta</b>, <b>Copiar hoja de carga</b> y links de <b>Google Maps</b> (de a 10 paradas).</li>
   <li><b>Ocultar paradas</b> contrae la tarjeta.</li>
 </ul>
+<h3>Link para el chofer</h3>
+<ul>
+  <li>En cada camión, <b>📱 Link para el chofer</b> crea un link con su hoja de ruta. Se copia con <b>Copiar mensaje para WhatsApp</b> (o <b>Copiar link</b>) y se le manda al chofer.</li>
+  <li>El chofer lo abre en el celular, sin usuario ni contraseña. Ve el camión, la fecha, la cantidad de clientes y el avance, y cada cliente en orden con dirección, teléfono, horario que recibe, hora estimada, observaciones, pedido e importe.</li>
+  <li>Cada cliente tiene <b>📍 Ir con Google Maps</b> (abre la navegación directo a ese cliente, sin armar tramos de 10), <b>📞 Llamar</b>, <b>✓ Entregado</b> y <b>✗ No entregado</b> con el motivo (cerrado, no estaba, no lo quiso, sin dinero, no llegué u otro). Si se equivoca, toca <b>Deshacer</b>.</li>
+  <li>La próxima entrega aparece resaltada y al final está <b>Volver al depósito</b> con su botón de Google Maps.</li>
+  <li><b>Avance en la oficina:</b> en unos segundos aparece en el Ruteo: el chip 📱 de la tarjeta (por ejemplo 📱 5/16), cada cliente con ✓ Entregado o ✗ No entregado y la hora, y la columna <b>Chofer</b> del Resumen de camiones.</li>
+  <li><b>Cambios:</b> si después de mandar el link se mueven clientes o se edita un pedido de ese camión, la hoja del chofer se actualiza sola (el mismo link). El chofer la ve al recargar o en menos de un minuto.</li>
+  <li><b>Sin señal:</b> las marcas quedan guardadas en el celular y se envían cuando vuelve la conexión.</li>
+  <li><b>Link nuevo</b> crea otro link y el anterior deja de funcionar (por ejemplo, si se mandó al chofer equivocado). Las marcas no se pierden. Los links vencen dos días después de la fecha del reparto.</li>
+  <li>Cualquiera que tenga el link puede ver ese reparto: mandalo solo al chofer.</li>
+</ul>
 <h3>Resumen de camiones</h3>
 <p>Tabla con todos los camiones: clientes, CAJ, kg contra capacidad, importe, km, manejo y hora de vuelta (en rojo si pasa su límite). Tiene botones <b>PDF</b> por depósito y para todos. Tocá una fila para ir a ese camión.</p>
 <ul>
@@ -304,7 +316,7 @@ th{font-weight:800}
 <h2>10. Administración</h2>
 <ul>
   <li><b>Dónde están los datos:</b> en una planilla de Google privada. La página se conecta con un puente de Apps Script (<code>Code.gs</code>).</li>
-  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>7</b>.</li>
+  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>8</b> (la 8 agrega los links para el chofer y la hoja <code>Repartos</code>).</li>
   <li><b>Conexión:</b> solo la ven los administradores. Desde la pantalla de ingreso, "Acceso técnico (administrador)" permite entrar con la clave maestra en caso de emergencia.</li>
   <li><b>Volver atrás:</b> la página tiene todas sus versiones guardadas y se puede volver a cualquiera en minutos. Code.gs: elegir una versión anterior en Administrar implementaciones. Datos: Archivo › Historial de versiones de la planilla.</li>
 </ul>
@@ -322,6 +334,8 @@ th{font-weight:800}
   <tr><td>Un cliente con horario no lo respeta</td><td>Revisá que su ventana esté en formato 09:30&gt;&gt;11:00 (Datos › Ventanas horarias a corregir).</td></tr>
   <tr><td>Un camión vuelve después de su hora límite</td><td>Armá de nuevo, pasá clientes a otro camión, agregá un flete o mové pedidos a otro día.</td></tr>
   <tr><td>Las horas estimadas no coinciden con la realidad</td><td>Ajustá el factor de tránsito o los minutos por cliente en Depósitos y camiones.</td></tr>
+  <tr><td>El chofer ve "Este link ya no está activo"</td><td>Se creó un link nuevo o venció (dos días después de la fecha). Mandale el link actual desde su camión en el Ruteo.</td></tr>
+  <tr><td>Las marcas del chofer no aparecen</td><td>Esperá unos segundos o tocá Actualizar. Si el chofer no tenía señal, se envían cuando vuelve.</td></tr>
   <tr><td>No cambia nada después de una actualización</td><td>Recargá la página (F5).</td></tr>
 </table>
 </section>
@@ -329,6 +343,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">17/11/2026</span> · Link para el chofer: hoja de ruta en el celular con Google Maps por cliente, Entregado / No entregado con motivo, y el avance en vivo en el Ruteo (chip por camión, marcas por cliente y columna Chofer). Requiere Code.gs versión 8.</li>
   <li><span class="fecha">16/11/2026</span> · Reparto del trabajo entre camiones (Menos tiempo total / Equilibrado / Parejo), para que no quede un camión con una sola parada mientras otro hace una vuelta larga.</li>
   <li><span class="fecha">16/11/2026</span> · Copiar para WhatsApp: el total muestra solo el importe (sin CAJ), porque el trozado se vende de a 10 kg y la suma en CAJ confundía. El botón de pantalla completa ya no tapa el encabezado al hacer scroll, y en pantallas anchas el mapa vuelve a quedar fijo mientras se recorren las tarjetas.</li>
   <li><span class="fecha">14/11/2026</span> · Mapa en pantalla completa. Hora límite de vuelta al depósito (13:00 general, editable por camión: 11:00 para el transbordo de Hurlingham). Que salgan todos los camiones disponibles. Tilde por fecha para el camión que no sale (service).</li>

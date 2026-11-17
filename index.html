@@ -236,6 +236,9 @@ a.btn{text-decoration:none;display:inline-block}
 .mapfs{position:absolute;top:10px;right:10px;z-index:10;   /* arriba del mapa (z 0) y debajo del encabezado fijo (z 20) */
 box-shadow:0 2px 8px rgba(0,0,0,.25)}
 /* Mapa en pantalla completa */
+.repbox{border:1.5px solid var(--verde-claro);background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:8px 0}
+.repurl .inp{width:100%;font-size:12.5px}
+.rstops li.hecha{opacity:.8}
 .rmapw.full{position:fixed!important;inset:0;top:0!important;z-index:2000;border-radius:0;margin:0;display:flex;flex-direction:column}
 .rmapw.full #map{flex:1;height:auto;min-height:0;border-radius:0}
 body.mapfull{overflow:hidden}
@@ -687,7 +690,7 @@ function renderKpis(){
 function setFecha(f){
   if(S.ed&&S.ed.dirty&&!confirmDiscard()){$("#dDate").value=S.fecha;return}
   S.fecha=f;S.rutaSel=null;S.rutaSelInfo="";$("#dDate").value=f;$("#dLabel").textContent=dLong(f);
-  closeEditor(true);S.dia={pedidos:{}};S.ruta=null;S.pick=null;S.fit=true;S.v.dFecha=null; // al cambiar de fecha se vuelve a bajar el día, aunque sea la misma
+  closeEditor(true);S.dia={pedidos:{}};S.ruta=null;S.repartos=[];S.repAbierto=null;S.pick=null;S.fit=true;S.v.dFecha=null; // al cambiar de fecha se vuelve a bajar el día, aunque sea la misma
   renderAll();subscribeDay();loadHist();
 }
 let discardArmed=0;
@@ -977,7 +980,7 @@ async function sync(silent){
   syncing=false;
 }
 function applyDay(d){
-  S.dia={pedidos:d.pedidos||{}};S.ruta=d.ruta||null;
+  S.dia={pedidos:d.pedidos||{}};S.ruta=d.ruta||null;S.repartos=d.repartos||[];
   if(S.ruta&&S.ruta.sel&&!S.rutaSel){S.rutaSel=S.ruta.sel;S.rutaSelInfo="selección guardada"}
   if(S.ed&&S.ed.base){const cur=S.dia.pedidos[S.ed.key];if(cur&&cur.editado!==S.ed.base.editado&&cur.editPor!==S.uid){if(S.ed.dirty){S.ed.remoteChanged=true;S.ed.forzar=true;S.ed.base=cur;renderEditor()}else{openEditor(S.ed.cli,true)}}}
 }
@@ -2049,17 +2052,18 @@ function rutaResumen(m){
       <td class="n">${tr.st.length?moneyShort(tr.imp):"—"}</td>
       <td class="n">${tr.st.length?(tr.real?`<b>${nf1.format(km)}</b><div class="note">por calles</div>`:`~${nf0.format(km)}<div class="note">estimado</div>`):"—"}</td>
       <td class="n">${tr.real?durTxt(tr.real.min):"—"}</td>
-      <td class="n">${tr.st.length?`<span${tr.h.exceso>0?' style="color:var(--danger);font-weight:800"':""}>~${min2hm(tr.h.vuelta)}</span>${tr.h.vmax!=null?`<div class="note">límite ${min2hm(tr.h.vmax)}</div>`:""}${tr.h.nTarde?`<div class="note" style="color:var(--danger)">${tr.h.nTarde} tarde</div>`:""}`:"—"}</td></tr>`};
+      <td class="n">${tr.st.length?`<span${tr.h.exceso>0?' style="color:var(--danger);font-weight:800"':""}>~${min2hm(tr.h.vuelta)}</span>${tr.h.vmax!=null?`<div class="note">límite ${min2hm(tr.h.vmax)}</div>`:""}${tr.h.nTarde?`<div class="note" style="color:var(--danger)">${tr.h.nTarde} tarde</div>`:""}`:"—"}</td>
+      <td class="n">${(()=>{const a=repAvance(tr.t.id,tr.st);if(!a)return '<span class="note">sin link</span>';return `<b>${a.hechas}/${a.total}</b>${a.no?`<div class="note" style="color:var(--danger)">${a.no} sin entregar</div>`:""}${a.ult?`<div class="note">${hhmm(a.ult).slice(6)}</div>`:""}`})()}</td></tr>`};
   const fu=fueraDia();
-  const filas=m.trucks.map(fila).join("")+camionesTodos().filter(t=>fu.has(t.id)).map(t=>`<tr class="vacio nosale"><td><input type="checkbox" data-sale="${esc(t.id)}" title="Tildá para que salga hoy" aria-label="${esc(t.nombre)} sale hoy"> <b>${esc(t.nombre)}</b><div class="note">${esc(t.dep.nombre)} · no sale hoy</div></td><td colspan="7" class="note">No disponible para esta fecha (service u otro motivo).</td></tr>`).join("");
+  const filas=m.trucks.map(fila).join("")+camionesTodos().filter(t=>fu.has(t.id)).map(t=>`<tr class="vacio nosale"><td><input type="checkbox" data-sale="${esc(t.id)}" title="Tildá para que salga hoy" aria-label="${esc(t.nombre)} sale hoy"> <b>${esc(t.nombre)}</b><div class="note">${esc(t.dep.nombre)} · no sale hoy</div></td><td colspan="8" class="note">No disponible para esta fecha (service u otro motivo).</td></tr>`).join("");
   const pk=m.pend.reduce((a,s)=>a+s.kg,0);
-  const sin=m.pend.length?`<tr data-goto="none" class="sinc"><td><span class="rsw" style="background:#6b7280;display:inline-block;vertical-align:-2px"></span> <b>Sin camión</b></td><td class="n">${m.pend.length}</td><td class="n">${nf1.format(m.pend.reduce((a,s)=>a+s.caj,0))}</td><td class="n">${nf0.format(pk)}</td><td class="n">${moneyShort(m.pend.reduce((a,s)=>a+s.imp,0))}</td><td></td><td></td><td></td></tr>`:"";
+  const sin=m.pend.length?`<tr data-goto="none" class="sinc"><td><span class="rsw" style="background:#6b7280;display:inline-block;vertical-align:-2px"></span> <b>Sin camión</b></td><td class="n">${m.pend.length}</td><td class="n">${nf1.format(m.pend.reduce((a,s)=>a+s.caj,0))}</td><td class="n">${nf0.format(pk)}</td><td class="n">${moneyShort(m.pend.reduce((a,s)=>a+s.imp,0))}</td><td></td><td></td><td></td><td></td></tr>`:"";
   const algunaAbierta=m.trucks.some(tr=>tr.st.length&&!S.col.has(tr.t.id))||(m.pend.length&&!S.col.has("none"));
   const depsCon=(S.log.depositos||[]).filter(d=>m.trucks.some(tr=>tr.st.length&&tr.t.dep.id===d.id));
   const pdfBtns=depsCon.map(d=>`<button class="btn sm pri" data-pdfdep="${esc(d.id)}" title="Hoja de carga de todos los camiones de ${esc(d.nombre)}">PDF ${esc(d.nombre)}</button>`).join("")+(depsCon.length>1?`<button class="btn sm" data-pdfdep="*">PDF todos</button>`:"");
   return `<div class="panel"><div class="ph"><h2>Resumen de camiones</h2><span class="sp"></span>${pdfBtns}<button class="btn sm" id="rtColAll">${algunaAbierta?"Ocultar todas las paradas":"Ver todas las paradas"}</button></div>
-    <div class="tblwrap"><table class="rsum"><thead><tr><th>Camión</th><th class="n">Clientes</th><th class="n">CAJ</th><th class="n">Kg / capacidad</th><th class="n">Importe</th><th class="n">Km</th><th class="n">Manejo</th><th class="n">Vuelve</th></tr></thead>
-    <tbody>${filas}${sin}</tbody><tfoot><tr><td>Total en camiones</td><td class="n">${P}</td><td class="n">${nf1.format(C)}</td><td class="n">${nf0.format(K)} kg</td><td class="n">${moneyShort(I)}</td><td class="n">${est?"~":""}${nf0.format(KM)}</td><td class="n">${MIN&&!est?durTxt(MIN):MIN?"≥ "+durTxt(MIN):"—"}</td><td></td></tr></tfoot></table></div>
+    <div class="tblwrap"><table class="rsum"><thead><tr><th>Camión</th><th class="n">Clientes</th><th class="n">CAJ</th><th class="n">Kg / capacidad</th><th class="n">Importe</th><th class="n">Km</th><th class="n">Manejo</th><th class="n">Vuelve</th><th class="n" title="Entregas marcadas por el chofer desde su link">Chofer</th></tr></thead>
+    <tbody>${filas}${sin}</tbody><tfoot><tr><td>Total en camiones</td><td class="n">${P}</td><td class="n">${nf1.format(C)}</td><td class="n">${nf0.format(K)} kg</td><td class="n">${moneyShort(I)}</td><td class="n">${est?"~":""}${nf0.format(KM)}</td><td class="n">${MIN&&!est?durTxt(MIN):MIN?"≥ "+durTxt(MIN):"—"}</td><td></td><td></td></tr></tfoot></table></div>
     <div class="note" style="padding:8px 16px">Destildá el camión que no sale hoy (service u otro motivo): solo vale para esta fecha.${est&&P?` Los km con "~" son estimados en línea recta; tocá <b>Calcular km por calles</b> para compararlos con los reales.`:""}</div></div>`;
 }
 function renderRuteo(force){
@@ -2103,28 +2107,46 @@ function renderRuteo(force){
     if(hh)p.push(`Llega ~<b>${min2hm(hh.lle)}</b>`);if(v)p.push(`recibe ${ventTxt(v)}`);else if(s.ventTxt)p.push(`<span title="${esc(s.ventTxt)}">ventana sin formato</span>`);
     let chip="";if(hh&&hh.late>0)chip=` <span class="chip st dng">llega tarde (+${nf0.format(hh.late+tpv.tol)} min)</span>`;else if(hh&&hh.w>tpv.tol)chip=` <span class="chip st warn">espera ${nf0.format(hh.w)} min</span>`;else if(hh&&hh.w>=1)p.push(`espera ${nf0.format(hh.w)} min`);
     return p.length||chip?`<div class="note hora">${p.join(" · ")}${chip}</div>`:""};
-  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}${horaHtml(s,k)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
+  const mkAll=repMarcas();
+  const marcaChip=s=>{const x=mkAll.get(s.id);if(!x)return "";return ` <span class="chip st ${x.e==="ok"?"ok":"dng"}" title="Marcado por el chofer">${x.e==="ok"?"✓ Entregado":"✗ No entregado"} ${hhmm(x.t).slice(6)}${x.nota?" · "+esc(x.nota):""}</span>`};
+  const stopRow=(s,k,col,tid)=>`<li data-id="${esc(s.id)}"${mkAll.get(s.id)?' class="hecha"':""}><span class="rn" style="background:${col}">${k==null?"·":k+1}</span><div class="rsi"><b data-focus="${esc(s.id)}">${esc(s.c.nom)}</b>${calChip(s)}${zonaChip(s,tid)}${marcaChip(s)}${horaHtml(s,k)}<div class="note">${esc([s.c.dir,s.c.ciu].filter(Boolean).join(", "))} · ${nf0.format(s.kg)} kg${k==null&&s.depNear?" · "+esc(s.depNear.nombre)+" a "+nf0.format(s.dist)+" km":""}</div>${s.o.obs?`<div class="obs">${esc(s.o.obs)}</div>`:""}${k==null?sugHtml(s):""}</div>
     <div class="rsa">${tid?`<button class="btn sm" data-up="${esc(s.id)}" aria-label="Subir">↑</button><button class="btn sm" data-dn="${esc(s.id)}" aria-label="Bajar">↓</button>`:""}<button class="btn sm" data-pick="${esc(s.id)}" title="Corregir el punto haciendo clic en el mapa">📍</button><select class="inp" data-mv="${esc(s.id)}" aria-label="Mover a">${opts(tid||"none")}</select></div></li>`;
   const colBtn=(id,n)=>n?`<button class="btn sm" data-col="${esc(id)}" aria-expanded="${!S.col.has(id)}">${S.col.has(id)?"Ver paradas":"Ocultar paradas"}</button>`:"";
   const resumen=camionesTodos().length?rutaResumen(m):"";
+  // Recuadro del link del chofer (cuando se abre) y chip de avance en el encabezado de la tarjeta.
+  const repBox=tr=>{const r=repDe(tr.t.id);if(!r||S.repAbierto!==tr.t.id)return "";const url=repUrl(r.token);
+    return `<div class="repbox"><div class="note" style="margin-bottom:6px">Mandale este link al chofer. Se actualiza solo si cambian sus paradas o los pedidos.</div>
+      <div class="repurl"><input class="inp" readonly value="${esc(url)}" onclick="this.select()"></div>
+      <div class="clrow" style="margin-top:6px"><button class="btn sm pri" data-repcopy="${esc(tr.t.id)}">Copiar mensaje para WhatsApp</button><button class="btn sm" data-repurl="${esc(tr.t.id)}">Copiar link</button><a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">Abrir</a><button class="btn sm" data-repnew="${esc(tr.t.id)}" title="Crea un link nuevo; el anterior deja de funcionar">Link nuevo</button><button class="btn sm" data-repclose>Cerrar</button></div></div>`};
+  const avChip=tr=>{const a=repAvance(tr.t.id,tr.st);if(!a)return "";return ` <span class="chip ${a.hechas===a.total&&a.total?"st ok":"acc"}" title="Avance del chofer${a.ult?" · última marca "+hhmm(a.ult).slice(6):""}">📱 ${a.hechas}/${a.total}${a.no?` · ${a.no} sin entregar`:""}</span>`};
   const cards=m.trucks.map((tr,i)=>{const col=PAL[i%PAL.length];const cap=tr.t.capKg||0,capT=capTol(tr.t);const pct=cap?tr.kg/cap*100:0;const st=tr.kg>capT?"dng":tr.kg>cap?"warn":"ok";const cerrada=S.col.has(tr.t.id);
-    return `<div class="panel rcard" data-tid="${esc(tr.t.id)}"><div class="ph"><span class="rsw" style="background:${col}"></span><h2 style="margin:0">${esc(tr.t.nombre)}</h2><span class="note">${esc(tr.t.dep.nombre)}</span>${tr.t.flete?`<span class="chip warn">Flete · solo esta fecha</span>`:""}<span class="sp"></span><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)} kg</span>${colBtn(tr.t.id,tr.st.length)}</div>
+    return `<div class="panel rcard" data-tid="${esc(tr.t.id)}"><div class="ph"><span class="rsw" style="background:${col}"></span><h2 style="margin:0">${esc(tr.t.nombre)}</h2><span class="note">${esc(tr.t.dep.nombre)}</span>${tr.t.flete?`<span class="chip warn">Flete · solo esta fecha</span>`:""}${avChip(tr)}<span class="sp"></span><span class="chip st ${st}">${nf0.format(tr.kg)} / ${nf0.format(cap)} kg</span>${colBtn(tr.t.id,tr.st.length)}</div>
      <div class="pb">${tr.t.flete?`<div class="clrow" style="margin-bottom:10px"><label class="tgl">Nombre <input class="inp" data-fl="${esc(tr.t.id)}" data-campo="nombre" value="${esc(tr.t.nombre)}" style="width:140px"></label><label class="tgl">Capacidad <input class="inp num" data-fl="${esc(tr.t.id)}" data-campo="capKg" value="${tr.t.capKg||0}" inputmode="numeric" style="width:80px"> kg</label><label class="tgl">Sale de <select class="inp" data-fl="${esc(tr.t.id)}" data-campo="dep">${(S.log.depositos||[]).map(d=>`<option value="${esc(d.id)}"${d.id===tr.t.dep.id?" selected":""}>${esc(d.nombre)}</option>`).join("")}</select></label><button class="btn sm dng" data-delflete="${esc(tr.t.id)}">Quitar flete</button></div>`:""}<div class="rbar"><span style="width:${Math.min(100,pct)}%;background:${st==="ok"?"var(--verde)":st==="warn"?"var(--amarillo-osc)":"var(--danger)"}"></span></div>
      <div class="note" style="margin:6px 0 8px">${tr.st.length} paradas · ${nf1.format(tr.caj)} CAJ · ${moneyShort(tr.imp)} · ${kmTxt(tr)}${tr.t.tol?` · tolerancia +${tr.t.tol}%`:""}${tr.st.length?` · sale ${min2hm(tpv.sal)}, vuelve ~<b${tr.h.exceso>0?' class="pasa"':""}>${min2hm(tr.h.vuelta)}</b>${tr.h.vmax!=null?` (límite ${min2hm(tr.h.vmax)})`:""}`:""}${tr.h.nTarde?` · <span class="pasa">${tr.h.nTarde} fuera de horario</span>`:""}</div>
      ${tr.st.length&&cerrada?"":tr.st.length?`<ol class="rstops">${tr.st.map((s,k)=>stopRow(s,k,col,tr.t.id)).join("")}</ol>
-     <div class="ract"><button class="btn sm" data-opt="${esc(tr.t.id)}">Optimizar orden</button>${tr.real?"":`<button class="btn sm" data-real="${esc(tr.t.id)}"${con?"":" disabled"}>Km por calles</button>`}<button class="btn sm" data-pdf="${esc(tr.t.id)}">PDF de carga</button><button class="btn sm" data-hr="${esc(tr.t.id)}">Copiar hoja de ruta</button><button class="btn sm" data-hc="${esc(tr.t.id)}">Copiar hoja de carga</button>${gmapsLinks(tr.t.dep,tr.st).map((u,k,a)=>`<a class="btn sm pri" href="${esc(u)}" target="_blank" rel="noopener">Google Maps${a.length>1?" tramo "+(k+1):""}</a>`).join("")}</div>`:`<div class="note">Sin paradas asignadas.</div>`}</div></div>`}).join("");
+     ${repBox(tr)}
+     <div class="ract"><button class="btn sm pri" data-replink="${esc(tr.t.id)}" title="Link con la hoja de ruta para el celular del chofer">📱 Link para el chofer</button><button class="btn sm" data-opt="${esc(tr.t.id)}">Optimizar orden</button>${tr.real?"":`<button class="btn sm" data-real="${esc(tr.t.id)}"${con?"":" disabled"}>Km por calles</button>`}<button class="btn sm" data-pdf="${esc(tr.t.id)}">PDF de carga</button><button class="btn sm" data-hr="${esc(tr.t.id)}">Copiar hoja de ruta</button><button class="btn sm" data-hc="${esc(tr.t.id)}">Copiar hoja de carga</button>${gmapsLinks(tr.t.dep,tr.st).map((u,k,a)=>`<a class="btn sm pri" href="${esc(u)}" target="_blank" rel="noopener">Google Maps${a.length>1?" tramo "+(k+1):""}</a>`).join("")}</div>`:`<div class="note">Sin paradas asignadas.</div>`}</div></div>`}).join("");
   const pend=m.pend.length?`<div class="panel rcard" data-tid="none"><div class="ph"><span class="rsw" style="background:#6b7280"></span><h2 style="margin:0">Sin camión</h2><span class="note">${m.pend.length} cliente${m.pend.length>1?"s":""}</span><span class="sp"></span><span class="chip">${nf0.format(m.pend.reduce((a,s)=>a+s.kg,0))} kg</span>${colBtn("none",m.pend.length)}</div>${S.col.has("none")?"":`<div class="pb"><ol class="rstops">${m.pend.map(s=>stopRow(s,null,"#6b7280",null)).join("")}</ol></div>`}</div>`:"";
   $("#rtCards").innerHTML=(resumen+cards+pend)||`<div class="panel"><div class="empty"><b>Sin pedidos para rutear</b>Los pedidos del ${esc(dLong(S.fecha))} aparecen acá.</div></div>`;
   const pc=S.pick&&(S.cliById.get(S.pick)||(rutaStops().find(s=>s.id===S.pick)||{}).c);
   $("#pickbar").innerHTML=S.pick?`<div class="pickbar">Hacé clic en el mapa donde está ${esc(pc?pc.nom:S.pick)}<span style="flex:1"></span><button class="btn sm" id="pickNo">Cancelar</button></div>`:"";
   document.body.classList.toggle("picking",!!S.pick);
   $("#mapNote").innerHTML=`Cuadrados: depósitos · Círculos numerados: orden de entrega · Borde punteado: ubicación aproximada · Línea punteada: recta (estimado × ${nf1.format(S.log.factorKm||1.3)}) · Línea llena: recorrido por calles`;
-  drawMap(m);renderLogCfg();
+  drawMap(m);renderLogCfg();repActualizar(m);
 }
 $("#v-ruteo").addEventListener("click",e=>{const t=e.target;
   if(t.id==="rtSug"){sugerirRutas();return}
   if(t.closest("#mapFs")){mapaCompleto();return}
   if(t.closest("[data-sale]"))return;   // el tilde de "sale hoy" se maneja en change
+  // Link del chofer: lo crea (o reusa el que ya existe) y abre el recuadro para copiarlo.
+  const rl=t.closest("[data-replink]");if(rl){const tid=rl.dataset.replink;if(S.repAbierto===tid&&repDe(tid)){S.repAbierto=null;renderRuteo(true);return}
+    const tr=rutaModel().trucks.find(x=>x.t.id===tid);if(!tr||!tr.st.length){toast("El camión no tiene paradas");return}
+    rl.disabled=true;rl.textContent="Creando link…";guardarReparto(tr,false).then(r=>{if(r){S.repAbierto=tid;renderRuteo(true)}else renderRuteo(true)});return}
+  const rc=t.closest("[data-repcopy],[data-repurl]");if(rc){const tid=rc.dataset.repcopy||rc.dataset.repurl;const r=repDe(tid);const tr=rutaModel().trucks.find(x=>x.t.id===tid);if(!r||!tr)return;
+    const url=repUrl(r.token);if(rc.dataset.repcopy)copyText(msgRep(tr,url),"Mensaje copiado: pegalo en WhatsApp");else copyText(url,"Link copiado");return}
+  const rn=t.closest("[data-repnew]");if(rn){const tid=rn.dataset.repnew;if(rn.dataset.conf!=="1"){rn.dataset.conf="1";rn.textContent="Confirmar: el link anterior deja de andar";return}
+    const tr=rutaModel().trucks.find(x=>x.t.id===tid);if(tr)guardarReparto(tr,true).then(r=>{if(r)toast("Link nuevo creado. Mandáselo al chofer: el anterior ya no funciona.")});return}
+  if(t.closest("[data-repclose]")){S.repAbierto=null;renderRuteo(true);return}
   if(t.id==="rtReal"){kmReales();return}
   if(t.id==="rtAll"){S.rutaSel=null;S.rutaSelInfo="";S.fit=true;if(S.ruta)saveRuta(S.ruta);else renderRuteo(true);return}
   if(t.id==="pickNo"){S.pick=null;renderRuteo(true);return}
@@ -2149,6 +2171,44 @@ $("#v-ruteo").addEventListener("click",e=>{const t=e.target;
   const sg=t.closest("[data-sug]");if(sg){moveStop(sg.dataset.sug,sg.dataset.to,+sg.dataset.pos);toast("Cliente movido");return}
   const hr=t.closest("[data-hr]"),hc=t.closest("[data-hc]");if(hr||hc){const tr=rutaModel().trucks.find(x=>x.t.id===(hr||hc).dataset[hr?"hr":"hc"]);copyText(hr?hojaRuta(tr):hojaCarga(tr),hr?"Hoja de ruta copiada":"Hoja de carga copiada");return}
 });
+/* ---------- reparto para el chofer (17/11, Code.gs v8) ----------
+   Cada camión puede tener un link (chofer.html#t=token) con su hoja de ruta: paradas en orden, pedidos, botón a Google Maps y
+   "Entregado / No entregado". La hoja de ruta la arma esta página (repartoDatos) y se vuelve a subir sola si cambian las paradas o los
+   pedidos de ese camión. Las marcas del chofer llegan con la sincronización (S.repartos[].estado) y se ven en las tarjetas y el resumen. */
+S.repartos=[];S.repAbierto=null;
+const repDe=tid=>(S.repartos||[]).find(r=>r.camion===tid);
+// Marcas del día por parada (de cualquier camión: si una parada se movió, igual se ve lo que marcó el chofer).
+function repMarcas(){const m=new Map();for(const r of S.repartos||[])for(const id in r.estado||{})if(id[0]!=="_")m.set(id,{...r.estado[id],camion:r.camion});return m}
+const repUrl=tok=>{const base=location.protocol==="file:"?"https://aviguri.github.io/pedidos/":location.href;return new URL("chofer.html",base).href.split("#")[0]+"#t="+tok};
+const hashStr=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)};
+function repartoDatos(tr){
+  const tp=TP();
+  const paradas=tr.st.map(s=>{const st=orderStats(s.o);
+    return {id:s.id,nom:s.c.nom,dir:s.c.dir||"",ciu:s.c.ciu||"",tel:s.c.tel||"",lat:s.lat,lon:s.lon,aprox:s.g.cal==="ciudad"||!!s.g.cambio,
+      vent:s.vent?ventTxt(s.vent):"",obs:s.o.obs||"",items:st.lines.map(l=>({c:CO(l.p),d:l.p.nombre,q:`${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"}`})),
+      caj:nf1.format(s.caj),imp:Math.round(s.imp)}});
+  const base={v:1,camion:tr.t.nombre,dep:{nombre:tr.t.dep.nombre,lat:+tr.t.dep.lat,lon:+tr.t.dep.lon},fecha:S.fecha,fechaTxt:dLong(S.fecha),salida:min2hm(tp.sal),
+    paradas,tot:{n:paradas.length,caj:nf1.format(tr.caj),kg:Math.round(tr.kg),imp:Math.round(tr.imp)}};
+  const hash=hashStr(JSON.stringify(base));   // sin horarios estimados: cambian solos y no son motivo para volver a subirla
+  base.vuelta=tr.st.length?"~"+min2hm(tr.h.vuelta):"";tr.st.forEach((s,k)=>{if(s.hh)base.paradas[k].lle=min2hm(s.hh.lle)});
+  return {datos:base,hash};
+}
+async function guardarReparto(tr,renovar,silencioso){
+  if(!S.db){toast("Falta conectar la planilla");return null}
+  if(S.ver&&S.ver<8){toast("Para los links de reparto hay que actualizar Code.gs a la versión 8");return null}
+  const {datos,hash}=repartoDatos(tr);
+  try{const j=await call("guardarReparto",{fecha:S.fecha,camion:tr.t.id,nombre:tr.t.nombre,datos,hash,renovar:!!renovar});
+    S.repartos=(S.repartos||[]).filter(r=>r.camion!==tr.t.id).concat([j.reparto]);if(!silencioso)renderRuteo(true);return j.reparto}
+  catch(e){if(!silencioso)toast("No se pudo crear el link: "+e.message);return null}
+}
+// Si cambian las paradas o los pedidos de un camión que ya tiene link, se vuelve a subir su hoja de ruta (de a uno, sin apuro).
+let repSubiendo=false;
+function repActualizar(m){if(repSubiendo||!S.db||armando||(S.ver&&S.ver<8))return;
+  const tr=m.trucks.find(x=>{const r=repDe(x.t.id);return r&&r.hash!==repartoDatos(x).hash});if(!tr)return;
+  repSubiendo=true;setTimeout(async()=>{try{await guardarReparto(tr,false,true)}finally{repSubiendo=false}},2500)}
+const msgRep=(tr,url)=>`Hola! Este es tu reparto de ${dLong(S.fecha)} (${tr.t.nombre}, ${tr.st.length} clientes):\n${url}\nAbrilo en el celular: tocá "Ir con Google Maps" para ir a cada cliente y marcá Entregado o No entregado.`;
+function repAvance(tid,st){const mk=repMarcas();const r=repDe(tid);if(!r)return null;const hechas=st.filter(s=>mk.get(s.id));const ok=hechas.filter(s=>mk.get(s.id).e==="ok").length;
+  const ult=hechas.reduce((a,s)=>Math.max(a,mk.get(s.id).t||0),0);return {r,hechas:hechas.length,ok,no:hechas.length-ok,total:st.length,ult}}
 // Camión disponible o no para la fecha: se guarda en la ruta del día; si no sale, sus paradas quedan sin camión.
 function setSale(tid,on){const R=rutaCopy();const f=new Set(R.fuera||[]);if(on)f.delete(tid);else{f.add(tid);for(const k in R.asig)if(R.asig[k]===tid)R.asig[k]="none";delete R.orden[tid];delete R.real[tid]}
   R.fuera=[...f];saveRuta(R);const t=camionesTodos().find(x=>x.id===tid);toast(on?`${t?t.nombre:"El camión"} vuelve a salir. Tocá Armar rutas sugeridas.`:`${t?t.nombre:"El camión"} no sale hoy. Tocá Armar rutas sugeridas para repartir sus paradas.`)}
