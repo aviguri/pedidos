@@ -207,7 +207,7 @@ th{font-weight:800}
 <h3>Link para el chofer</h3>
 <ul>
   <li>En cada camión, <b>📱 Link para el chofer</b> crea un link con su hoja de ruta. Se copia con <b>Copiar mensaje para WhatsApp</b> (o <b>Copiar link</b>) y se le manda al chofer.</li>
-  <li>El chofer lo abre en el celular, sin usuario ni contraseña. Ve el camión, la fecha, la cantidad de clientes y el avance, y cada cliente en orden con dirección, teléfono, horario que recibe, hora estimada, observaciones, pedido e importe.</li>
+  <li>El chofer lo abre en el celular, sin usuario ni contraseña. Ve el camión, la fecha, la cantidad de clientes y el avance, y cada cliente en orden con dirección, teléfono, horario que recibe, hora estimada, observaciones, pedido e importe. Cada producto muestra la cantidad, el <b>precio</b> (por caja o por kg) y el <b>subtotal</b>, para armar la boleta.</li>
   <li>Cada cliente tiene <b>📍 Ir con Google Maps</b> (abre la navegación directo a ese cliente, sin armar tramos de 10), <b>📞 Llamar</b>, <b>✓ Entregado</b> y <b>✗ No entregado</b> con el motivo (cerrado, no estaba, no lo quiso, sin dinero, no llegué u otro). Si se equivoca, toca <b>Deshacer</b>.</li>
   <li>La próxima entrega aparece resaltada y al final está <b>Volver al depósito</b> con su botón de Google Maps.</li>
   <li><b>Avance en la oficina:</b> en unos segundos aparece en el Ruteo: el chip 📱 de la tarjeta (por ejemplo 📱 5/16), cada cliente con ✓ Entregado o ✗ No entregado y la hora, y la columna <b>Chofer</b> del Resumen de camiones.</li>
@@ -229,7 +229,7 @@ th{font-weight:800}
   <li>Una hoja por camión: encabezado con depósito, fecha, entregas, CAJ, kg, km, importe y horarios.</li>
   <li><b>QR del reparto</b> arriba a la derecha: el chofer lo escanea con la cámara del celular y abre su link de reparto (el mismo de "📱 Link para el chofer"). Si el camión todavía no tenía link, se crea solo al generar el PDF.</li>
   <li>Mercadería total por producto con la columna <b>Cargado</b> para tildar. Se carga al revés: la última entrega va al fondo.</li>
-  <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma.</li>
+  <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma. En Mercadería, cada producto va con cantidad × precio = subtotal (por ejemplo <code>CT ATILIOS: 30 kg × $ 2.700 = $ 81.000</code>), y el importe total de la entrega a la derecha.</li>
 </ul>
 <h3>Fletes y falta de capacidad</h3>
 <ul>
@@ -350,6 +350,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">19/11/2026</span> · Precio y subtotal de cada producto en el PDF de carga y en la página del chofer (para la boleta). Los links ya enviados se actualizan solos al abrir el Ruteo.</li>
   <li><span class="fecha">19/11/2026</span> · Rutas compactas por dirección: cada camión sale hacia un solo lado del depósito. Con los pedidos del 18/11, el Accelo ya no va a Manzanares antes de la zona norte (Manzanares pasa al Daily con Zelaya y Matheu), con menos km y la última vuelta 12:41 en vez de 12:58.</li>
   <li><span class="fecha">18/11/2026</span> · Función <code>renovarClave</code> en Code.gs para cambiar la clave maestra de administrador.</li>
   <li><span class="fecha">18/11/2026</span> · Sucursales con horario de recepción propio (Recibe desde / hasta): el ruteo lo tiene en cuenta igual que la ventana del cliente. Requiere Code.gs versión 10.</li>

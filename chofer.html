@@ -51,7 +51,9 @@ header .sub{font-size:13.5px;opacity:.92}
 .its{margin:8px 0 0;padding:0;list-style:none;border-top:1px dashed var(--line)}
 .its li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:15px}
 .its b{font-weight:800}
-.its .q{white-space:nowrap;font-weight:800}
+.its .q{white-space:nowrap;font-weight:800;text-align:right}
+.its .pu{color:var(--muted);font-size:13.5px}
+.its .sub{font-weight:700;font-size:14px}
 .tot{display:flex;justify-content:space-between;margin-top:6px;font-weight:800}
 .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .btn{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;min-height:46px}
@@ -143,7 +145,9 @@ function render(){
   const oc=$("#ocultar").checked;
   const cards=ps.map((p,i)=>{const m=E[p.id];if(m&&oc)return "";const esSig=sig&&sig.id===p.id;
     const tel=telUrl(p.tel);
-    const its=(p.items||[]).map(it=>`<li><span><b>${esc(it.c)}</b>${it.d&&it.d!==it.c?` <span class="dir">${esc(it.d)}</span>`:""}</span><span class="q">${esc(it.q)}</span></li>`).join("");
+    // 19/11: precio unitario y subtotal por producto (para la boleta). Los links viejos sin precio se ven como antes.
+    const its=(p.items||[]).map(it=>{const hayPr=it.pr!=null&&it.pr>0;
+      return `<li><span><b>${esc(it.c)}</b>${it.d&&it.d!==it.c?` <span class="dir">${esc(it.d)}</span>`:""}${hayPr?`<br><span class="pu">${money(it.pr)} ${it.u==="kg"?"el kg":"c/u"}</span>`:""}</span><span class="q">${esc(it.q)}${hayPr?`<br><span class="sub">${money(it.sub)}</span>`:""}</span></li>`}).join("");
     const estadoHtml=m?`<div class="done ${m.e}">${m.e==="ok"?"✓ Entregado":"✗ No entregado"} · ${hhmm(m.t)}${m.nota?" · "+esc(m.nota):""}${m.pend?" · sin enviar":""} <button class="btn sm" data-undo="${esc(p.id)}">Deshacer</button></div>`:"";
     const motivos=R.abierto===p.id?`<div class="motivos">${["Cerrado","No estaba","No lo quiso","Sin dinero","No llegué"].map(x=>`<button class="btn sm" data-mot="${esc(x)}" data-id="${esc(p.id)}">${x}</button>`).join("")}<input id="motTxt" placeholder="Otro motivo (opcional)"><button class="btn sm nob" data-mot="" data-id="${esc(p.id)}">Confirmar sin entregar</button><button class="btn sm" data-cancel>Cancelar</button></div>`:"";
     return `<div class="card${esSig?" sig":""}${m?" "+m.e:""}" id="p_${esc(p.id)}">
@@ -154,7 +158,7 @@ function render(){
       </div></div>
       ${p.obs?`<div class="obs">${esc(p.obs)}</div>`:""}
       ${its?`<ul class="its">${its}</ul>`:""}
-      <div class="tot"><span>${p.caj!=null?esc(p.caj)+" CAJ":""}</span><span>${p.imp!=null?money(p.imp):""}</span></div>
+      <div class="tot"><span>${p.caj!=null?esc(p.caj)+" CAJ":""}</span><span>${p.imp!=null?"Total "+money(p.imp):""}</span></div>
       ${m?estadoHtml:`<div class="acts"><a class="btn maps" href="${esc(mapsUrl(p))}" target="_blank" rel="noopener">📍 Ir con Google Maps</a>${tel?`<a class="btn" href="${esc(tel)}">📞 Llamar</a>`:""}<button class="btn okb" data-ok="${esc(p.id)}">✓ Entregado</button><button class="btn nob" data-no="${esc(p.id)}">✗ No entregado</button></div>${motivos}`}
     </div>`}).join("");
   const dep=d.dep;const fin=dep?`<div class="card fin"><div class="hd"><div class="n">🏁</div><div style="flex:1"><div class="nom">Volver al depósito ${esc(dep.nombre)}</div><div class="dir">${sig?"Después de la última entrega":"Recorrido terminado"}${d.vuelta?" · vuelta estimada "+esc(d.vuelta):""}</div></div></div>

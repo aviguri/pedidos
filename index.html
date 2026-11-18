@@ -2027,9 +2027,10 @@ async function pdfCarga(trs,nombre){
     doc.autoTable({startY:y+3,head:[["#","Cliente y dirección","Mercadería","CAJ","Importe","Recibió (firma y aclaración)"]],
       body:tr.st.map((s,k)=>{const c=s.c;const ad=[c.dir,c.ciu].filter(Boolean).join(", ");
         const cli=`${c.nom}  (#${s.o.cli})\n${ad}${c.tel?"\nTel. "+c.tel:""}${s.hh?"\n"+horaParada(s):""}${s.o.obs?"\nObs: "+s.o.obs:""}`;
-        return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""}`).join("\n"),fmt1(s.caj),money(s.imp),""]}),
+        // 19/11: precio y subtotal por producto (el chofer arma la boleta con esto).
+        return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""} × ${money(l.pr)} = ${money(l.q*l.pr)}`).join("\n"),fmt1(s.caj),money(s.imp),""]}),
       theme:"grid",styles:{fontSize:8.8,cellPadding:1.8,valign:"top"},headStyles:{fillColor:verde},
-      columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:70},2:{cellWidth:42},3:{cellWidth:13,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:31}},
+      columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:54},2:{cellWidth:64,fontSize:8.2},3:{cellWidth:11,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:27}},
       bodyStyles:{minCellHeight:14},margin:{left:12,right:12},
       didParseCell:d=>{if(d.section==="body"&&d.column.index===1)d.cell.styles.fontStyle="normal"}});
   });
@@ -2234,7 +2235,7 @@ function repartoDatos(tr){
   const tp=TP();
   const paradas=tr.st.map(s=>{const st=orderStats(s.o);
     return {id:s.id,nom:s.c.nom,dir:s.c.dir||"",ciu:s.c.ciu||"",tel:s.c.tel||"",lat:s.lat,lon:s.lon,aprox:s.g.cal==="ciudad"||!!s.g.cambio,
-      vent:s.vent?ventTxt(s.vent):"",obs:s.o.obs||"",items:st.lines.map(l=>({c:CO(l.p),d:l.p.nombre,q:`${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"}`})),
+      vent:s.vent?ventTxt(s.vent):"",obs:s.o.obs||"",items:st.lines.map(l=>({c:CO(l.p),d:l.p.nombre,q:`${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"}`,u:l.p.unidad==="kg"?"kg":"CAJ",pr:Math.round(l.pr),sub:Math.round(l.q*l.pr)})),
       caj:nf1.format(s.caj),imp:Math.round(s.imp)}});
   const base={v:1,camion:tr.t.nombre,dep:{nombre:tr.t.dep.nombre,lat:+tr.t.dep.lat,lon:+tr.t.dep.lon},fecha:S.fecha,fechaTxt:dLong(S.fecha),salida:min2hm(tp.sal),
     paradas,tot:{n:paradas.length,caj:nf1.format(tr.caj),kg:Math.round(tr.kg),imp:Math.round(tr.imp)}};
