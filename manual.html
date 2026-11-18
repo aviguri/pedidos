@@ -40,7 +40,7 @@ th{font-weight:800}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 18/11/2026</p></div></header>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 19/11/2026</p></div></header>
 <div class="wrap">
 <nav>
   <b>Contenido</b>
@@ -174,7 +174,7 @@ th{font-weight:800}
 <ol>
   <li><b>Entregar todo lo que entra:</b> la capacidad de cada camión más su tolerancia es un límite. Si no entra todo, quedan afuera los clientes que más tiempo agregan.</li>
   <li><b>Que salgan todos los camiones disponibles.</b> No hace falta que vayan parejos: un camión puede salir más cargado que otro si va a una zona en particular.</li>
-  <li><b>Rutas compactas:</b> cada camión trabaja una zona, sin juntar zonas separadas en el mismo recorrido (por ejemplo, Trujui y Capital).</li>
+  <li><b>Rutas compactas:</b> cada camión trabaja una zona, sin juntar zonas separadas en el mismo recorrido (por ejemplo, Trujui y Capital). Además cada camión sale <b>en una sola dirección</b> desde el depósito: puede ir lejos por un mismo eje (Escobar → Maschwitz → zona norte), pero no abrirse hacia dos lados (Manzanares y zona norte).</li>
   <li><b>Repartir el trabajo</b> según la opción elegida: <i>Menos tiempo total</i> (la menor suma de horas, aunque un camión haga una vuelta larga y otro casi nada), <i>Equilibrado</i> (recomendado: reparte las horas a cambio de unos minutos más) o <i>Parejo</i>.</li>
   <li><b>Que cada camión vuelva a tiempo:</b> de vuelta en el depósito antes de las 13:00, o antes de su propia hora (por ejemplo el camión de Hurlingham que tiene que estar a las 11:00 para el transbordo).</li>
   <li><b>Cumplir los horarios de entrega</b> de los clientes que tienen ventana horaria (ver abajo).</li>
@@ -350,6 +350,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">19/11/2026</span> · Rutas compactas por dirección: cada camión sale hacia un solo lado del depósito. Con los pedidos del 18/11, el Accelo ya no va a Manzanares antes de la zona norte (Manzanares pasa al Daily con Zelaya y Matheu), con menos km y la última vuelta 12:41 en vez de 12:58.</li>
   <li><span class="fecha">18/11/2026</span> · Función <code>renovarClave</code> en Code.gs para cambiar la clave maestra de administrador.</li>
   <li><span class="fecha">18/11/2026</span> · Sucursales con horario de recepción propio (Recibe desde / hasta): el ruteo lo tiene en cuenta igual que la ventana del cliente. Requiere Code.gs versión 10.</li>
   <li><span class="fecha">18/11/2026</span> · Revisión completa y correcciones: la hoja del chofer siempre lleva todas las paradas de su camión; las marcas del chofer llegan en orden; si dos personas cambian la misma ruta o el mismo pedido, la app avisa en vez de pisar; respuestas más rápidas de la planilla. Requiere Code.gs versión 9.</li>

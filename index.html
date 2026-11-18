@@ -1762,9 +1762,18 @@ const tourMin=(dep,arr)=>tourLen(dep,arr,T);
    recorrido. Es lo que en otros sistemas se llama "clustering" o "territorios": cada camión trabaja una zona. */
 const COMPACTO={no:0,normal:3,fuerte:8};   // 18/11: fuerte 3 → 8 (con 84 pedidos el Accelo volvía a juntar Pilar con la zona norte)
 const betaComp=()=>{const v=S.log&&S.log.compacto;return COMPACTO[v==null?"fuerte":v]||0};
-function compCost(arr){const b=betaComp();if(!b||arr.length<2)return 0;let la=0,lo=0;for(const s of arr){la+=+s.lat;lo+=+s.lon}const c={lat:la/arr.length,lon:lo/arr.length};
-  let d=0;for(const s of arr)d+=hav(s,c);return b*d}
-const tourCost=(dep,arr)=>arr.length?tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0)+ventCost(dep,arr)+compCost(arr):penVacio();
+/* Dirección (19/11): la distancia al centro no distingue una ruta larga en línea (Escobar → Panamericana → zona norte) de una en V
+   (Manzanares a −119° y zona norte a +120° vistos desde Escobar). Se suma β·k × Σ km al depósito × (1 − cos(desvío del rumbo medio)):
+   las paradas en la misma dirección no pagan nada aunque estén lejos; las cercanas al depósito casi nada. */
+const DIR_K=1;
+const rumbo=(o,p)=>Math.atan2((p.lon-o.lon)*Math.cos(o.lat*Math.PI/180),p.lat-o.lat);
+function compCost(dep,arr){const b=betaComp();if(!b||arr.length<2)return 0;let la=0,lo=0;for(const s of arr){la+=+s.lat;lo+=+s.lon}const c={lat:la/arr.length,lon:lo/arr.length};
+  let d=0;for(const s of arr)d+=hav(s,c);
+  const k=window.__DIRK!=null?window.__DIRK:DIR_K;
+  if(k&&dep){let sx=0,sy=0;const r=arr.map(s=>{const km=hav(dep,s),a=rumbo(dep,s);sx+=km*Math.cos(a);sy+=km*Math.sin(a);return [km,a]});
+    if(sx||sy){const m=Math.atan2(sy,sx);let x=0;for(const [km,a] of r)x+=km*(1-Math.cos(a-m));d+=k*x}}
+  return b*d}
+const tourCost=(dep,arr)=>arr.length?tourLen(dep,arr,C)+arr.reduce((a,s)=>a+pen(dep,s),0)+ventCost(dep,arr)+compCost(dep,arr):penVacio();
 // 2-opt: da vuelta tramos mientras acorte. Con km por calle la ida y la vuelta pueden diferir, así que se cuenta el tramo invertido completo.
 function twoOpt(dep,arr){
   if(VW){   // con ventanas o límite de vuelta el orden cambia los horarios: se evalúa el recorrido completo
