@@ -642,7 +642,9 @@ const nomL=o=>o.nom+(+o.suc>1&&o.sucNom?" · "+o.sucNom:"");
 const sucsOf=cid=>(S.suc.get(String(cid))||[]).filter(s=>s.activa).sort((a,b)=>a.n-b.n);
 function lugarOf(c,n){n=+n||1;if(n<2)return {id:c.id,cli:c.id,n:1,nom:c.nom,sucNom:"",dir:c.dir||"",ciu:c.ciu||"",tel:c.tel||""};
   const s=(S.suc.get(c.id)||[]).find(x=>x.n===n)||{nombre:"Sucursal "+n};
-  return {id:lugarId(c.id,n),cli:c.id,n,nom:c.nom,sucNom:s.nombre,dir:s.dir||"",ciu:s.ciu||"",tel:s.tel||c.tel||""}}
+  return {id:lugarId(c.id,n),cli:c.id,n,nom:c.nom,sucNom:s.nombre,dir:s.dir||"",ciu:s.ciu||"",tel:s.tel||c.tel||"",vent:s.vent||""}}
+// Ventana horaria del lugar: la sucursal tiene la suya (Code.gs v10, cargada en el editor); la principal usa VENTANA_HORARIO del cliente.
+const ventLugar=(lg,cc)=>lg.n>1?(lg.vent||""):((cc&&cc.vent)||"");
 const tienePedido=id=>{const o=S.dia.pedidos&&S.dia.pedidos["c"+id];return !!(o&&!o.anulado&&orderStats(o).lines.length)};
 const pedidosDe=cid=>liveOrders().filter(o=>String(o.cli)===String(cid)&&!o.anulado&&orderStats(o).lines.length);
 function applySuc(list){const m=new Map();for(const s of list||[]){const k=String(s.cli);if(!m.has(k))m.set(k,[]);m.get(k).push(s)}S.suc=m;for(const c of S.clientes)c._k=null}
@@ -650,22 +652,28 @@ function sucBarHtml(){
   const ed=S.ed;if(!ed)return "";const c=ed.cli;const ls=[{n:1,nombre:"Principal"},...sucsOf(c.id)];
   const f=S.sucForm;
   const btns=ls.length>1?`<span class="lbl">Entregar en</span>`+ls.map(s=>{const id=lugarId(c.id,s.n);const on=s.n===ed.lg.n;const ya=tienePedido(id);
-      return `<button type="button" class="btn sm${on?" pri":""}" data-sucn="${s.n}" title="${esc(s.n>1?[s.dir,s.ciu].filter(Boolean).join(", "):[c.dir,c.ciu].filter(Boolean).join(", "))}">${esc(s.nombre)}${ya?" ✓":""}</button>`}).join(""):"";
+      return `<button type="button" class="btn sm${on?" pri":""}" data-sucn="${s.n}" title="${esc((s.n>1?[s.dir,s.ciu]:[c.dir,c.ciu]).filter(Boolean).join(", ")+((v=>v?" · recibe "+ventTxt(v):"")(parseVentana(s.n>1?s.vent:c.vent))))}">${esc(s.nombre)}${ya?" ✓":""}</button>`}).join(""):"";
   const form=f?`<div class="sucf"><div class="con">
       <label>Nombre de la sucursal<input class="inp" data-sf="nombre" value="${esc(f.nombre||"")}" placeholder="Por ejemplo: Local Merlo"></label>
       <label>Dirección<input class="inp" data-sf="dir" value="${esc(f.dir||"")}" placeholder="Calle y altura"></label>
       <label>Ciudad<input class="inp" data-sf="ciu" value="${esc(f.ciu||"")}"></label>
       <label>Teléfono<input class="inp" data-sf="tel" value="${esc(f.tel||"")}"></label>
-      <label>Observaciones<input class="inp" data-sf="obs" value="${esc(f.obs||"")}" placeholder="Horario, quién recibe…"></label></div>
+      <label>Observaciones<input class="inp" data-sf="obs" value="${esc(f.obs||"")}" placeholder="Quién recibe…"></label>
+      <label>Recibe desde<input class="inp" type="time" data-sf="vA" value="${esc(f.vA||"")}"></label>
+      <label>Recibe hasta<input class="inp" type="time" data-sf="vB" value="${esc(f.vB||"")}"></label></div>
       <div class="clrow" style="margin-top:8px">${f.n?`<label class="tgl"><input type="checkbox" data-sf="activa"${f.activa!==false?" checked":""}> Activa</label>`:""}<span style="flex:1"></span><button type="button" class="btn sm" id="sucNo">Cancelar</button><button type="button" class="btn sm pri" id="sucOk">${f.n?"Guardar sucursal":"Agregar sucursal"}</button></div>
-      <div class="note">La ubicación se busca sola con Google al guardar. Después se puede corregir en Ubicaciones o con 📍 en Ruteo.</div></div>`:"";
+      <div class="note">La ubicación se busca sola con Google al guardar. Después se puede corregir en Ubicaciones o con 📍 en Ruteo. El horario de recepción es opcional: si se carga, el ruteo trata de llegar dentro de ese rango (dejá los dos vacíos para "sin horario").</div></div>`:"";
   return `<div class="sucbar">${btns}<span style="flex:1"></span>${ed.lg.n>1&&!f?`<button type="button" class="btn sm" id="sucEdit">Editar sucursal</button>`:""}${f?"":`<button type="button" class="btn sm" id="sucAdd">+ Sucursal</button>`}</div>${form}`;
 }
 async function saveSucursal(){
   const f=S.sucForm,ed=S.ed;if(!f||!ed)return;
   if(!String(f.nombre||"").trim()||!String(f.dir||"").trim()){toast("La sucursal necesita nombre y dirección");return}
+  const vA=String(f.vA||"").trim(),vB=String(f.vB||"").trim();let ventana="";
+  if(vA||vB){if(!vA||!vB){toast("Completá las dos horas de recepción, o dejá las dos vacías");return}
+    ventana=`${vA}>>${vB}`;if(!parseVentana(ventana)){toast("La hora hasta tiene que ser posterior a la hora desde");return}}
+  if(ventana&&S.ver&&S.ver<10){toast("Para guardar el horario de la sucursal hay que actualizar Code.gs a la versión 10");return}
   const prev=f.n?(S.suc.get(ed.cli.id)||[]).find(s=>s.n===f.n):null;
-  try{const j=await call("guardarSucursal",{sucursal:{cli:ed.cli.id,n:f.n||0,nombre:f.nombre,direccion:f.dir,ciudad:f.ciu,telefono:f.tel,obs:f.obs,activa:f.activa!==false}});
+  try{const j=await call("guardarSucursal",{sucursal:{cli:ed.cli.id,n:f.n||0,nombre:f.nombre,direccion:f.dir,ciudad:f.ciu,telefono:f.tel,obs:f.obs,activa:f.activa!==false,ventana}});
     const s=j.sucursal;const arr=(S.suc.get(ed.cli.id)||[]).filter(x=>x.n!==s.n);arr.push(s);S.suc.set(ed.cli.id,arr);for(const c of S.clientes)c._k=null;
     S.sucForm=null;toast(`Sucursal guardada · ${s.nombre}`);
     if(!ed.dirty&&s.activa)openEditor(ed.cli,true,s.n);else renderEditor();
@@ -882,7 +890,7 @@ $("#cliCard").addEventListener("change",e=>{if(e.target.dataset.sf==="activa"&&S
 $("#cliCard").addEventListener("click",e=>{
   const sb=e.target.closest("[data-sucn]");if(sb){const n=+sb.dataset.sucn;if(n===S.ed.lg.n)return;if(S.ed.dirty&&!confirmDiscard())return;openEditor(S.ed.cli,false,n);return}
   if(e.target.id==="sucAdd"){S.sucForm={ciu:S.ed.cli.ciu||""};renderEditor();const i=document.querySelector('[data-sf="nombre"]');i&&i.focus();return}
-  if(e.target.id==="sucEdit"){const s=(S.suc.get(S.ed.cli.id)||[]).find(x=>x.n===S.ed.lg.n);if(s){S.sucForm={...s};renderEditor()}return}
+  if(e.target.id==="sucEdit"){const s=(S.suc.get(S.ed.cli.id)||[]).find(x=>x.n===S.ed.lg.n);if(s){const v=parseVentana(s.vent);S.sucForm={...s,vA:v?min2hm(v.a):"",vB:v?min2hm(v.b):""};renderEditor()}return}
   if(e.target.id==="sucNo"){S.sucForm=null;renderEditor();return}
   if(e.target.id==="sucOk"){saveSucursal();return}
   if(e.target.id==="provEdit"){if(S.ed.dirty){toast("Guardá o cancelá el pedido antes de editar los datos del cliente");return}const c=S.ed.cli;S.provForm={id:c.id,nombre:c.nom,dir:c.dir,ciu:c.ciu,tel:c.tel,obs:c.obsP};S.ed=null;renderEditor();renderList();return}
@@ -1736,9 +1744,9 @@ function rutaStops(todos){
   return ks.map(k=>{const o=ped[k];const id=k.slice(1);const cc=S.cliById.get(String(o.cli));
     const lg=cc?lugarOf(cc,o.suc):{id,cli:String(o.cli),n:+o.suc||1,nom:o.nom,sucNom:o.sucNom||"",dir:o.dir,ciu:o.ciu,tel:""};
     const c={...lg,nom:lg.nom+(lg.n>1?" · "+lg.sucNom:"")};const g=geoOf(c);const st=orderStats(o);
-    // Ventana horaria: la del cliente (PEDIDOS BD) vale para su dirección principal; las sucursales no tienen.
-    const vent=lg.n>1?null:parseVentana(cc&&cc.vent);
-    return {id,c,o,g,kg:orderKg(o),caj:st.cajas,imp:st.imp,lat:g.lat,lon:g.lon,vent,ventTxt:lg.n>1?"":(cc&&cc.vent)||""}});
+    // Ventana horaria: la del cliente (PEDIDOS BD) para la dirección principal; cada sucursal la suya (18/11).
+    const vt=ventLugar(lg,cc),vent=parseVentana(vt);
+    return {id,c,o,g,kg:orderKg(o),caj:st.cajas,imp:st.imp,lat:g.lat,lon:g.lon,vent,ventTxt:vt}});
 }
 function classify(stops){
   const deps=(S.log.depositos||[]).filter(d=>d.lat!=null);const sin=[],interior=[],ok=[];

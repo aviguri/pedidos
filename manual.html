@@ -106,6 +106,7 @@ th{font-weight:800}
   <li>La <b>principal</b> es la dirección de PEDIDOS BD. Las demás se cargan con <b>+ Sucursal</b> (cualquier usuario puede).</li>
   <li>Arriba del editor aparece <b>Entregar en:</b> con una ✓ en las que ya tienen pedido. Cada sucursal tiene su propio pedido del día.</li>
   <li>Al guardar una, la app sigue con la próxima sucursal sin pedido (Esc para terminar).</li>
+  <li><b>Horario de recepción:</b> al dar de alta o con <b>Editar sucursal</b> se cargan <b>Recibe desde</b> y <b>Recibe hasta</b>. El ruteo lo usa igual que la ventana del cliente. Si se dejan las dos vacías, la sucursal no tiene horario. La principal sigue usando VENTANA_HORARIO de PEDIDOS BD.</li>
   <li>Precios, habituales y saldo son siempre los del cliente.</li>
 </ul>
 <h3 id="provisorios">Clientes provisorios</h3>
@@ -187,7 +188,8 @@ th{font-weight:800}
   <li>La ventana horaria del cliente sale de la columna <b>VENTANA_HORARIO</b> de PEDIDOS BD, con el formato <code>09:30&gt;&gt;11:00</code> (recibe de 9:30 a 11:00).</li>
   <li><b>Si llega antes</b> de que abra, el camión espera. Hasta 20 minutos de espera se toma como normal; más que eso el armado lo evita.</li>
   <li><b>Si llega después</b> del cierre, hasta 20 minutos está bien (tolerancia). Más tarde se marca en rojo <b>llega tarde</b> y aparece un aviso arriba.</li>
-  <li>Los clientes <b>sin ventana</b> no tienen restricción de horario. Las sucursales tampoco.</li>
+  <li>Las <b>sucursales</b> tienen su propio horario, que se carga en el editor del pedido (ver Sucursales).</li>
+  <li>Los clientes y sucursales <b>sin ventana</b> no tienen restricción de horario.</li>
   <li>No es una regla fija: si un día no hay forma de cumplir con todos, igual arma las rutas y avisa a quiénes llega tarde.</li>
   <li>El tiempo de cada parada es: <b>minutos por cliente</b> (10) + <b>segundos por bulto</b> (20 por CAJ). Por ejemplo, 15 CAJ son 10 + 5 = 15 minutos.</li>
 </ul>
@@ -319,7 +321,7 @@ th{font-weight:800}
 <h2>10. Administración</h2>
 <ul>
   <li><b>Dónde están los datos:</b> en una planilla de Google privada. La página se conecta con un puente de Apps Script (<code>Code.gs</code>).</li>
-  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>9</b> (la 8 agregó los links para el chofer y la hoja <code>Repartos</code>; la 9, el aviso de cambios cruzados en rutas y pedidos y lecturas más rápidas).</li>
+  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>10</b> (la 8 agregó los links para el chofer y la hoja <code>Repartos</code>; la 9, el aviso de cambios cruzados en rutas y pedidos y lecturas más rápidas; la 10, el horario de recepción de las sucursales, columna <code>ventana</code> de la hoja Sucursales).</li>
   <li><b>Pruebas automáticas:</b> antes de cada publicación se corre un conjunto de pruebas que usa datos inventados y no toca la planilla.</li>
   <li><b>Conexión:</b> solo la ven los administradores. Desde la pantalla de ingreso, "Acceso técnico (administrador)" permite entrar con la clave maestra en caso de emergencia.</li>
   <li><b>Volver atrás:</b> la página tiene todas sus versiones guardadas y se puede volver a cualquiera en minutos. Code.gs: elegir una versión anterior en Administrar implementaciones. Datos: Archivo › Historial de versiones de la planilla.</li>
@@ -347,6 +349,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">18/11/2026</span> · Sucursales con horario de recepción propio (Recibe desde / hasta): el ruteo lo tiene en cuenta igual que la ventana del cliente. Requiere Code.gs versión 10.</li>
   <li><span class="fecha">18/11/2026</span> · Revisión completa y correcciones: la hoja del chofer siempre lleva todas las paradas de su camión; las marcas del chofer llegan en orden; si dos personas cambian la misma ruta o el mismo pedido, la app avisa en vez de pisar; respuestas más rápidas de la planilla. Requiere Code.gs versión 9.</li>
   <li><span class="fecha">18/11/2026</span> · Rutas compactas más firmes: un camión ya no junta Pilar con la zona norte aunque los otros vayan cargados.</li>
   <li><span class="fecha">18/11/2026</span> · Zonas por depósito: la tabla suma las localidades de las sucursales (por ejemplo Boulogne) y las de los pedidos del día.</li>
