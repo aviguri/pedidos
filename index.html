@@ -768,7 +768,9 @@ function openEditor(c,noFocus,n){
     items[p.id]={q:it?it.q||0:0,pr:it&&it.pr?it.pr:(lp?lp[0]:(p.lista||0))};
   }
   if(ex&&ex.items)for(const k in ex.items)if(!items[k])items[k]={...ex.items[k]};
-  S.ed={cli:c,lg,key,exists:!!(ex&&!ex.anulado&&orderStats(ex).lines.length),wasAnul:!!(ex&&ex.anulado),items,obs:ex?ex.obs||"":"",estado:ex?ex.estado||"pendiente":"pendiente",dirty:false,base:ex||null,remoteChanged:false,extra:new Set(),all:false};
+  // Sin precio (20/11): el del pedido; si es nuevo, el del último pedido de ese lugar (se recuerda solo).
+  const hp=S.hist[lg.id];const sinPrecio=ex?!!ex.sinPrecio:!!(hp&&hp.o&&hp.o.sinPrecio);
+  S.ed={cli:c,lg,key,exists:!!(ex&&!ex.anulado&&orderStats(ex).lines.length),wasAnul:!!(ex&&ex.anulado),items,obs:ex?ex.obs||"":"",estado:ex?ex.estado||"pendiente":"pendiente",sinPrecio,dirty:false,base:ex||null,remoteChanged:false,extra:new Set(),all:false};
   renderEditor();
   if(!noFocus){const first=document.querySelector("#edBody .qty input");first&&first.focus();first&&first.select()}
   renderList();
@@ -826,7 +828,8 @@ function renderEditor(){
     ${hidden||ed.all?`<button class="btn sm" id="togAll" type="button">${ed.all?"Mostrar solo los habituales":"Ver los "+activeProds().length+" productos"}</button>`:""}</div>
     <div class="note" style="margin-top:6px">Se muestran los productos fijos, los que el cliente ya compró y los que tienen cantidad.</div>
     <div class="row2"><div><div class="lbl" style="margin-bottom:4px">Observaciones</div><textarea id="edObs" rows="2" placeholder="Horario, forma de pago, faltantes…">${esc(ed.obs)}</textarea></div>
-    <div><div class="lbl" style="margin-bottom:4px">Estado</div><select id="edEst" class="inp"><option value="pendiente">Pendiente</option><option value="confirmado">Confirmado</option></select></div></div>`;
+    <div><div class="lbl" style="margin-bottom:4px">Estado</div><select id="edEst" class="inp"><option value="pendiente">Pendiente</option><option value="confirmado">Confirmado</option></select>
+      <label style="margin-top:10px;display:flex;align-items:center;gap:7px;white-space:nowrap;font-weight:700;cursor:pointer" title="El chofer no ve los precios de este pedido (PDF de carga, link del reparto y hoja de ruta). Internamente los precios se guardan igual."><input type="checkbox" id="edSP"${ed.sinPrecio?" checked":""}> Sin precio</label></div></div>`;
   $("#edEst").value=ed.estado;
   $("#edAnular").hidden=!ed.exists;
   renderHist();
@@ -856,6 +859,7 @@ $("#edBody").addEventListener("input",e=>{
 });
 $("#edBody").addEventListener("change",e=>{
   if(e.target.id==="edEst"){S.ed.estado=e.target.value;S.ed.dirty=true}
+  if(e.target.id==="edSP"){S.ed.sinPrecio=e.target.checked;S.ed.dirty=true}
   const t=e.target;if(t.id&&t.id.startsWith("pr_")){const v=S.ed.items[t.closest(".prow").dataset.p].pr;t.value=v?nf0.format(v):""}
   if(t.id&&t.id.startsWith("q_")){const v=S.ed.items[t.closest(".prow").dataset.p].q;t.value=v?nf1.format(v):""}
 });
@@ -929,6 +933,7 @@ function diffOrder(b,o){
     else if(a.q>0&&n.q>0){if(a.q!==n.q)out.push(`${CO(p)} ${nf1.format(a.q)}→${nf1.format(n.q)}${u}`);if((a.pr||0)!==(n.pr||0))out.push(`${CO(p)} $${nf0.format(a.pr||0)}→$${nf0.format(n.pr||0)}`)}}
   if(b&&(b.obs||"")!==(o.obs||""))out.push("observación");
   if(b&&(b.estado||"pendiente")!==(o.estado||"pendiente"))out.push("estado: "+(o.estado||"pendiente"));
+  if(b&&!!b.sinPrecio!==!!o.sinPrecio)out.push(o.sinPrecio?"sin precio":"con precio");
   return out.join(" · ");
 }
 function addLog(b,entry){const log=((b&&b.log)||[]).slice(-29);log.push(entry);return log}
@@ -937,9 +942,10 @@ async function saveOrder(){
   if(!S.canWrite){toast("Tenés acceso de solo lectura");return}
   const s=edTotals();
   if(!s.lines.length){toast("Cargá al menos un producto con cantidad");return}
+  if(ed.sinPrecio&&S.ver&&S.ver<11){toast("Para guardar \"Sin precio\" hay que actualizar Code.gs a la versión 11");return}
   const items={};for(const k in ed.items){const it=ed.items[k];if(it.q>0||(ed.base&&ed.base.items&&ed.base.items[k]))items[k]={q:it.q||0,pr:it.pr||0}}
   const b=ed.base||{};
-  const o={cli:ed.cli.id,nom:ed.cli.nom,suc:ed.lg.n,sucNom:ed.lg.sucNom,dir:ed.lg.dir||"",ciu:ed.lg.ciu||"",items,obs:(ed.obs||"").trim(),estado:ed.estado||"pendiente",anulado:false,
+  const o={cli:ed.cli.id,nom:ed.cli.nom,suc:ed.lg.n,sucNom:ed.lg.sucNom,dir:ed.lg.dir||"",ciu:ed.lg.ciu||"",items,obs:(ed.obs||"").trim(),estado:ed.estado||"pendiente",sinPrecio:!!ed.sinPrecio,anulado:false,
     por:(b.por&&!b.anulado)?b.por:(S.uid||null),creado:(b.creado&&!b.anulado)?b.creado:Date.now(),editPor:S.uid||null,editado:Date.now()};
   const nuevo=!b.cli||b.anulado||!orderStats(b).lines.length;
   const det=nuevo?orderStats(o).lines.map(l=>`${CO(l.p)} ${nf1.format(l.q)}${l.p.unidad==="kg"?" kg":""}`).join(" · "):diffOrder(b,o);
@@ -1002,7 +1008,10 @@ function applyProd(p){S.productos=(p.productos||[]).map(x=>({...x}));S.palletCaj
 function subscribeDay(){if(S.db)sync()}
 async function loadHist(){
   S.hist={};if(!S.db)return;const f=S.fecha;
-  try{const j=await call("historial",{fecha:f});if(f!==S.fecha)return;S.hist=j.hist||{};if(S.ed)renderEditor()}catch(e){}
+  try{const j=await call("historial",{fecha:f});if(f!==S.fecha)return;S.hist=j.hist||{};
+    // Un pedido nuevo abierto antes de que llegara el historial toma el "Sin precio" del último pedido de ese lugar.
+    const ed=S.ed;if(ed&&!ed.base&&!ed.dirty){const h=S.hist[ed.lg.id];ed.sinPrecio=!!(h&&h.o&&h.o.sinPrecio)}
+    if(S.ed)renderEditor()}catch(e){}
 }
 function applyMaestro(mx){
   const info=mx.info||{};
@@ -1081,7 +1090,7 @@ function renderList(){
     const est=o.anulado?'<span class="chip st dng">Anulado</span>':(o.estado==="confirmado"?'<span class="chip st ok">Confirmado</span>':'<span class="chip st warn">Pendiente</span>');
     return `<tr class="ord${o.anulado?" anul":""}${S.ed&&S.ed.key===o.k?" sel":""}" data-k="${esc(o.k)}" tabindex="0">
       <td class="n muted">${o.anulado?"":numOf.get(o.k)||""}</td>
-      <td><div style="font-weight:600">${esc(o.nom)}${esProv(o.cli)?` <span class="chip st warn">Provisorio</span>`:""}${+o.suc>1?` <span class="chip acc">${esc(o.sucNom||"Sucursal "+o.suc)}</span>`:""}</div><div class="note">${esc(o.ciu||"")}</div>${o.obs?`<div class="obs" title="Observaciones">${esc(o.obs)}</div>`:""}</td>
+      <td><div style="font-weight:600">${esc(o.nom)}${esProv(o.cli)?` <span class="chip st warn">Provisorio</span>`:""}${+o.suc>1?` <span class="chip acc">${esc(o.sucNom||"Sucursal "+o.suc)}</span>`:""}${o.sinPrecio?` <span class="chip" title="El chofer no ve los precios de este pedido">Sin precio</span>`:""}</div><div class="note">${esc(o.ciu||"")}</div>${o.obs?`<div class="obs" title="Observaciones">${esc(o.obs)}</div>`:""}</td>
       <td>${itemsHtml(s)}</td>
       <td class="n"><b>${esc(nf1.format(s.cajas))}</b></td>
       <td class="n">${esc(money(s.imp))}</td>
@@ -1980,9 +1989,11 @@ async function kmReales(tids){
 }
 const kmTxt=tr=>tr.real?`${nf1.format(tr.real.km)} km por calles · ${durTxt(tr.real.min)} de manejo`:`~${nf0.format(tr.km)} km estimados`;
 const horaParada=s=>s.hh?`Llega ~${min2hm(s.hh.lle)}${s.vent?` · recibe ${ventTxt(s.vent)}`:""}${s.hh.late>0?" · TARDE":""}`:"";
+// Importe del camión que ve el chofer: sin los pedidos "Sin precio" (20/11).
+const impVisible=tr=>tr.st.reduce((a,s)=>a+(s.o.sinPrecio?0:s.imp),0);
 function hojaRuta(tr){const L=[`*HOJA DE RUTA* · ${tr.t.nombre} (${tr.t.dep.nombre}) · ${dLong(S.fecha)}`,`${tr.st.length} paradas · ${nf0.format(tr.kg)} kg · ${nf1.format(tr.caj)} CAJ · ${kmTxt(tr)}`,`Sale ${min2hm(TP().sal)} · vuelve ~${min2hm(tr.h.vuelta)}`,""];
   tr.st.forEach((s,i)=>{L.push(`${i+1}. *${s.c.nom}* (#${s.id})`);if(s.hh)L.push("   "+horaParada(s));const ad=[s.c.dir,s.c.ciu].filter(Boolean).join(", ");if(ad)L.push("   "+ad);if(s.c.tel)L.push("   Tel. "+s.c.tel);
-    L.push("   "+orderStats(s.o).lines.map(l=>`${CO(l.p)} ${nf1.format(l.q)}${l.p.unidad==="kg"?" kg":""}`).join(" · ")+` · ${money(s.imp)}`);if(s.o.obs)L.push("   Obs: "+s.o.obs)});
+    L.push("   "+orderStats(s.o).lines.map(l=>`${CO(l.p)} ${nf1.format(l.q)}${l.p.unidad==="kg"?" kg":""}`).join(" · ")+(s.o.sinPrecio?"":` · ${money(s.imp)}`));if(s.o.obs)L.push("   Obs: "+s.o.obs)});
   const r=repDe(tr.t.id);if(r)L.push("","Link del reparto (Google Maps por cliente y marcas de entrega):",repUrl(r.token));return L.join("\n")}   // los links de Google Maps por tramos se sacaron el 17/11: todo va por el link del chofer
 function hojaCarga(tr){const m=new Map();for(const s of tr.st)for(const l of orderStats(s.o).lines){const x=m.get(l.p.id)||{p:l.p,q:0};x.q+=l.q;m.set(l.p.id,x)}
   const L=[`*HOJA DE CARGA* · ${tr.t.nombre} (${tr.t.dep.nombre}) · ${dLong(S.fecha)}`,""];[...m.values()].sort((a,b)=>(a.p.orden||0)-(b.p.orden||0)).forEach(x=>L.push(`• ${CO(x.p)} (${x.p.nombre}): ${nf1.format(x.q)} ${x.p.unidad==="kg"?"kg":"CAJ"}`));
@@ -2023,7 +2034,7 @@ async function pdfCarga(trs,nombre){
     doc.setTextColor(0);doc.setFontSize(10);
     const cap=tr.t.capKg||0;
     const rep=qrOk&&repDe(tr.t.id);const QR=34;   // lado del QR en mm (arriba a la derecha, al lado de la mercadería)
-    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(tr.imp)} · sale ${min2hm(TP().sal)}, vuelve ~${min2hm(tr.h.vuelta)}`,12,29,{maxWidth:W-24});
+    doc.text(`${tr.st.length} entregas · ${fmt1(tr.caj)} CAJ · ${fmt0(tr.kg)} kg de ${fmt0(cap)} kg (${cap?Math.round(tr.kg/cap*100):0}%) · ${kmTxt(tr)} · ${moneyShort(impVisible(tr))} · sale ${min2hm(TP().sal)}, vuelve ~${min2hm(tr.h.vuelta)}`,12,29,{maxWidth:W-24});
     let qrFin=0;
     if(rep){const q=window.qrcode(0,"M");q.addData(repUrl(rep.token));q.make();const n=q.getModuleCount(),x0=W-12-QR,y0=34,c=QR/n;
       doc.setDrawColor(...verde);doc.setLineWidth(.4);doc.rect(x0-2,y0-2,QR+4,QR+13);doc.setFillColor(0,0,0);
@@ -2053,8 +2064,9 @@ async function pdfCarga(trs,nombre){
     doc.autoTable({startY:y+3,head:[["#","Cliente y dirección","Mercadería","CAJ","Importe","Recibió (firma y aclaración)"]],
       body:tr.st.map((s,k)=>{
         const cli=lineas[k].map(()=>" ").join("\n");
-        // 19/11: precio y subtotal por producto (el chofer arma la boleta con esto).
-        return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""} × ${money(l.pr)} = ${money(l.q*l.pr)}`).join("\n"),fmt1(s.caj),money(s.imp),""]}),
+        // 19/11: precio y subtotal por producto (el chofer arma la boleta con esto). 20/11: los pedidos "Sin precio" van sin precios ni importe.
+        const sp=!!s.o.sinPrecio;
+        return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""}`+(sp?"":` × ${money(l.pr)} = ${money(l.q*l.pr)}`)).join("\n"),fmt1(s.caj),sp?"—":money(s.imp),""]}),
       theme:"grid",styles:{fontSize:FS,cellPadding:PAD,valign:"top"},headStyles:{fillColor:verde},
       columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:ANCHO_CLI},2:{cellWidth:64,fontSize:8.2},3:{cellWidth:11,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:27}},
       bodyStyles:{minCellHeight:14},margin:{left:12,right:12},rowPageBreak:"avoid",   // una entrega nunca se parte entre páginas
@@ -2269,8 +2281,10 @@ function repartoDatos(tr){
     return {id:s.id,nom:s.c.nom,dir:s.c.dir||"",ciu:s.c.ciu||"",tel:s.c.tel||"",lat:s.lat,lon:s.lon,aprox:s.g.cal==="ciudad"||!!s.g.cambio,
       vent:s.vent?ventTxt(s.vent):"",obs:s.o.obs||"",items:st.lines.map(l=>({c:CO(l.p),d:l.p.nombre,q:`${nf1.format(l.q)} ${l.p.unidad==="kg"?"kg":"CAJ"}`,u:l.p.unidad==="kg"?"kg":"CAJ",pr:Math.round(l.pr),sub:Math.round(l.q*l.pr)})),
       caj:nf1.format(s.caj),imp:Math.round(s.imp)}});
+  // 20/11: los pedidos "Sin precio" llegan al chofer sin precio, subtotal ni importe; el total del camión no los suma.
+  tr.st.forEach((s,i)=>{if(!s.o.sinPrecio)return;const p=paradas[i];p.items=p.items.map(({pr,sub,...x})=>x);p.imp=null;p.sinPrecio=true});
   const base={v:1,camion:tr.t.nombre,dep:{nombre:tr.t.dep.nombre,lat:+tr.t.dep.lat,lon:+tr.t.dep.lon},fecha:S.fecha,fechaTxt:dLong(S.fecha),salida:min2hm(tp.sal),
-    paradas,tot:{n:paradas.length,caj:nf1.format(tr.caj),kg:Math.round(tr.kg),imp:Math.round(tr.imp)}};
+    paradas,tot:{n:paradas.length,caj:nf1.format(tr.caj),kg:Math.round(tr.kg),imp:Math.round(impVisible(tr))}};
   const hash=hashStr(JSON.stringify(base));   // sin horarios estimados: cambian solos y no son motivo para volver a subirla
   base.vuelta=tr.st.length?"~"+min2hm(tr.h.vuelta):"";tr.st.forEach((s,k)=>{if(s.hh)base.paradas[k].lle=min2hm(s.hh.lle)});
   return {datos:base,hash};

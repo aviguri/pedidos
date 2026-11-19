@@ -89,6 +89,7 @@ th{font-weight:800}
   <li>Botones <b>+ / −</b> con el paso de cada producto, o escribir la cantidad. El trozado se carga en kg.</li>
   <li><b>Observaciones:</b> quedan resaltadas en amarillo en la lista, la hoja de ruta y el PDF.</li>
   <li><b>Estado:</b> Pendiente o Confirmado.</li>
+  <li><b>Sin precio:</b> para clientes o sucursales cuyo precio se maneja por otro lado. El chofer no ve los precios de ese pedido: en el PDF de carga, el link del reparto y la hoja de ruta copiada aparecen solo las cantidades, y el total del camión no lo suma. Internamente el pedido guarda sus precios igual (lista, consolidado, Excel). El tilde se recuerda: el próximo pedido de ese cliente o sucursal ya viene tildado. En la lista del día se ve el chip <b>Sin precio</b>.</li>
 </ul>
 <h3>Botones del pedido</h3>
 <table>
@@ -322,7 +323,7 @@ th{font-weight:800}
 <h2>10. Administración</h2>
 <ul>
   <li><b>Dónde están los datos:</b> en una planilla de Google privada. La página se conecta con un puente de Apps Script (<code>Code.gs</code>).</li>
-  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>10</b> (la 8 agregó los links para el chofer y la hoja <code>Repartos</code>; la 9, el aviso de cambios cruzados en rutas y pedidos y lecturas más rápidas; la 10, el horario de recepción de las sucursales, columna <code>ventana</code> de la hoja Sucursales).</li>
+  <li><b>Actualizar Code.gs:</b> en la planilla, Extensiones › Apps Script, reemplazar todo el contenido, guardar y hacer <b>Implementar › Administrar implementaciones › lápiz › Nueva versión › Implementar</b>. La dirección no cambia. Versión actual: <b>11</b> (la 8 agregó los links para el chofer y la hoja <code>Repartos</code>; la 9, el aviso de cambios cruzados en rutas y pedidos y lecturas más rápidas; la 10, el horario de recepción de las sucursales, columna <code>ventana</code> de la hoja Sucursales; la 11, el tilde Sin precio, columna <code>sinPrecio</code> de la hoja Pedidos).</li>
   <li><b>Pruebas automáticas:</b> antes de cada publicación se corre un conjunto de pruebas que usa datos inventados y no toca la planilla.</li>
   <li><b>Conexión:</b> solo la ven los administradores. Desde la pantalla de ingreso, "Acceso técnico (administrador)" permite entrar con la clave maestra en caso de emergencia.</li>
   <li><b>Renovar la clave maestra:</b> en Apps Script, elegir la función <code>renovarClave</code> arriba y tocar <b>Ejecutar</b>. La clave nueva aparece en el <b>Registro de ejecución</b>; la anterior deja de andar en el acto. No hace falta nueva implementación y no afecta a los usuarios con contraseña ni a los links del chofer. Guardarla en un lugar seguro y no compartirla por chat ni WhatsApp.</li>
@@ -351,6 +352,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">20/11/2026</span> · Tilde <b>Sin precio</b> en el pedido: el chofer no ve los precios de ese cliente o sucursal. Requiere Code.gs versión 11.</li>
   <li><span class="fecha">20/11/2026</span> · PDF de carga: nombre y código del cliente en negrita y observaciones resaltadas en amarillo.</li>
   <li><span class="fecha">19/11/2026</span> · Botón de WhatsApp en la lista de Clientes para escribirle al cliente directamente.</li>
   <li><span class="fecha">19/11/2026</span> · Precio y subtotal de cada producto en el PDF de carga y en la página del chofer (para la boleta). Los links ya enviados se actualizan solos al abrir el Ruteo.</li>
