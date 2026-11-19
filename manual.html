@@ -40,7 +40,7 @@ th{font-weight:800}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 19/11/2026</p></div></header>
+<header><div class="in"><h1>Manual de uso · Pedidos AVIGURI</h1><p>Toma de pedidos y ruteo de entregas · Grupo CTS · Última actualización: 20/11/2026</p></div></header>
 <div class="wrap">
 <nav>
   <b>Contenido</b>
@@ -230,7 +230,7 @@ th{font-weight:800}
   <li>Una hoja por camión: encabezado con depósito, fecha, entregas, CAJ, kg, km, importe y horarios.</li>
   <li><b>QR del reparto</b> arriba a la derecha: el chofer lo escanea con la cámara del celular y abre su link de reparto (el mismo de "📱 Link para el chofer"). Si el camión todavía no tenía link, se crea solo al generar el PDF.</li>
   <li>Mercadería total por producto con la columna <b>Cargado</b> para tildar. Se carga al revés: la última entrega va al fondo.</li>
-  <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma. En Mercadería, cada producto va con cantidad × precio = subtotal (por ejemplo <code>CT ATILIOS: 30 kg × $ 2.700 = $ 81.000</code>), y el importe total de la entrega a la derecha.</li>
+  <li>Entregas en orden, con dirección, teléfono, hora estimada, ventana, observaciones y espacio para firma. El <b>nombre y el código del cliente</b> van en negrita verde y las <b>observaciones</b> en negrita cursiva sobre fondo amarillo, para encontrarlos de un vistazo. Una entrega nunca queda partida entre dos páginas. En Mercadería, cada producto va con cantidad × precio = subtotal (por ejemplo <code>CT ATILIOS: 30 kg × $ 2.700 = $ 81.000</code>), y el importe total de la entrega a la derecha.</li>
 </ul>
 <h3>Fletes y falta de capacidad</h3>
 <ul>
@@ -351,6 +351,7 @@ th{font-weight:800}
 <section id="cambios">
 <h2>12. Historial de cambios</h2>
 <ul class="cambios">
+  <li><span class="fecha">20/11/2026</span> · PDF de carga: nombre y código del cliente en negrita y observaciones resaltadas en amarillo.</li>
   <li><span class="fecha">19/11/2026</span> · Botón de WhatsApp en la lista de Clientes para escribirle al cliente directamente.</li>
   <li><span class="fecha">19/11/2026</span> · Precio y subtotal de cada producto en el PDF de carga y en la página del chofer (para la boleta). Los links ya enviados se actualizan solos al abrir el Ruteo.</li>
   <li><span class="fecha">19/11/2026</span> · Rutas compactas por dirección: cada camión sale hacia un solo lado del depósito. Con los pedidos del 18/11, el Accelo ya no va a Manzanares antes de la zona norte (Manzanares pasa al Daily con Zelaya y Matheu), con menos km y la última vuelta 12:41 en vez de 12:58.</li>

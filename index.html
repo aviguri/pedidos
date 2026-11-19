@@ -2040,15 +2040,31 @@ async function pdfCarga(trs,nombre){
     let y=Math.max(doc.lastAutoTable.finalY,qrFin)+5;
     doc.setFontSize(9);doc.setTextColor(...gris);doc.text("Cargar en orden inverso: la última entrega va primero (al fondo).",12,y);doc.setTextColor(0);
     // Entregas en orden
+    /* 20/11: en "Cliente y dirección" el nombre y el código van en negrita verde y las observaciones en negrita cursiva sobre amarillo
+       (como en la app). autoTable no mezcla estilos en una celda: se parte el texto a mano (partes[k]), la celda lleva líneas en blanco
+       para reservar el alto y el contenido se dibuja en didDrawCell. */
+    const FS=8.8,PAD=1.8,ANCHO_CLI=54,LH=FS*1.15*25.4/72;
+    const partes=tr.st.map(s=>{const c=s.c;const ad=[c.dir,c.ciu].filter(Boolean).join(", ");
+      return [{t:`${c.nom}  (#${s.o.cli})`,st:"bold",col:[1,68,31]},ad&&{t:ad},c.tel&&{t:"Tel. "+c.tel},s.hh&&{t:horaParada(s)},
+        s.o.obs&&{t:"Obs: "+s.o.obs,st:"bolditalic",hl:true}].filter(Boolean)});
+    const lineas=partes.map(ps=>{const out=[];for(const p of ps){doc.setFont("helvetica",p.st||"normal");doc.setFontSize(FS);
+      for(const s of doc.splitTextToSize(String(p.t),ANCHO_CLI-2*PAD-0.4))out.push({s,st:p.st||"normal",col:p.col,hl:p.hl})}
+      doc.setFont("helvetica","normal");return out});
     doc.autoTable({startY:y+3,head:[["#","Cliente y dirección","Mercadería","CAJ","Importe","Recibió (firma y aclaración)"]],
-      body:tr.st.map((s,k)=>{const c=s.c;const ad=[c.dir,c.ciu].filter(Boolean).join(", ");
-        const cli=`${c.nom}  (#${s.o.cli})\n${ad}${c.tel?"\nTel. "+c.tel:""}${s.hh?"\n"+horaParada(s):""}${s.o.obs?"\nObs: "+s.o.obs:""}`;
+      body:tr.st.map((s,k)=>{
+        const cli=lineas[k].map(()=>" ").join("\n");
         // 19/11: precio y subtotal por producto (el chofer arma la boleta con esto).
         return [String(k+1),cli,orderStats(s.o).lines.map(l=>`${CO(l.p)}: ${fmt1(l.q)}${l.p.unidad==="kg"?" kg":""} × ${money(l.pr)} = ${money(l.q*l.pr)}`).join("\n"),fmt1(s.caj),money(s.imp),""]}),
-      theme:"grid",styles:{fontSize:8.8,cellPadding:1.8,valign:"top"},headStyles:{fillColor:verde},
-      columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:54},2:{cellWidth:64,fontSize:8.2},3:{cellWidth:11,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:27}},
-      bodyStyles:{minCellHeight:14},margin:{left:12,right:12},
-      didParseCell:d=>{if(d.section==="body"&&d.column.index===1)d.cell.styles.fontStyle="normal"}});
+      theme:"grid",styles:{fontSize:FS,cellPadding:PAD,valign:"top"},headStyles:{fillColor:verde},
+      columnStyles:{0:{cellWidth:8,halign:"center",fontStyle:"bold"},1:{cellWidth:ANCHO_CLI},2:{cellWidth:64,fontSize:8.2},3:{cellWidth:11,halign:"right"},4:{cellWidth:22,halign:"right"},5:{cellWidth:27}},
+      bodyStyles:{minCellHeight:14},margin:{left:12,right:12},rowPageBreak:"avoid",   // una entrega nunca se parte entre páginas
+      didParseCell:d=>{if(d.section==="body"&&d.column.index===1)d.cell.styles.fontStyle="normal"},
+      didDrawCell:d=>{if(d.section!=="body"||d.column.index!==1)return;const ls=lineas[d.row.index];if(!ls)return;
+        const x=d.cell.x+PAD;let yy=d.cell.y+PAD;doc.setFontSize(FS);
+        for(const l of ls){
+          if(l.hl){doc.setFillColor(255,236,170);doc.rect(d.cell.x+0.6,yy-0.15,d.cell.width-1.2,LH+0.1,"F")}
+          doc.setFont("helvetica",l.st);doc.setTextColor(...(l.col||[0,0,0]));doc.text(l.s,x,yy,{baseline:"top"});yy+=LH}
+        doc.setFont("helvetica","normal");doc.setTextColor(0)}});
   });
   // Pie en todas las páginas
   const n=doc.internal.getNumberOfPages();const ahora=new Date().toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
